@@ -76,7 +76,7 @@ namespace CitiesIIAgentBridge
             using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<PrefabData>()))
             using (var es = q.ToEntityArray(Allocator.Temp)) foreach (var e in es)
             {
-                if (!ps.TryGetPrefab<ServicePrefab>(e, out var p)) continue;
+                if (!ps.TryGetPrefab<ServicePrefab>(e, out var p) || p == null) continue;
                 var row = new JObject { ["index"] = e.Index, ["version"] = e.Version, ["name"] = p.name };
                 var errors = new JObject();
                 // Some service prefabs have no initialized aggregate in a fresh city.
@@ -159,3 +159,4 @@ namespace CitiesIIAgentBridge
         }
     }
 }
+
