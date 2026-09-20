@@ -1,0 +1,8 @@
+records/
+plans/
+*.attempt.json
+live-*.json
+test-results.txt
+*.zip
+.env
+.env.*
