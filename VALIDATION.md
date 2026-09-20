@@ -36,3 +36,9 @@ Passed in a loaded city: compact brief; dynamic zone catalog; services query; ne
 FAILED: a node-attached water-pipe extension reported complete despite a 10-metre depth mismatch and new endpoint identity. Preview validation accepted a different temporary edge. Both newly created test segments were removed and their absence verified. No repeated placement attempt was made.
 
 0.4.4-coach.2 now limits preview evidence to new created edges (excluding modifications/deletions), checks curve endpoint height as well as node identity, and verifies actual created-edge attachment before reporting completion. Compiled against the installed game assembly. This correction is NOT yet live-tested or installed; replacing the running DLL requires closing the game. Earlier offline checks do not certify this native behaviour.
+
+## Live retest: 0.4.4-coach.2
+
+Confirmed loaded version and fresh session. Saved a checkpoint, then submitted one 20-metre extension from a rediscovered live Small Water Pipe endpoint at elevation zero. The operation failed before apply with attached_node_not_preserved_in_native_preview_inspect_node_height_and_network_do_not_retry_same_geometry. The same three nearby water edges, endpoint identities and lengths remained; money was unchanged. The tool returned to DefaultToolSystem with no active operation.
+
+This verifies rejection of the reproduced double-burial case, not successful native pipe attachment in general. The underlying native depth/snap issue remains unresolved. No second speculative placement was attempted.
