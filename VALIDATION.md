@@ -28,3 +28,11 @@ Live follow-up: whole-map outside-road traversal returned a complete disconnecte
 Compiled against the installed Game.dll. 135 checks passed: 91 native-independent mailbox/policy/recovery checks, 22 helper checks, 22 client checks. New regressions cover null dispatch, null client result, and queued result without an operation ID. Existing checks cover retry behaviour, one-submit polling, timestamp cultures and request chunking.
 
 These tests do not exercise Unity's live tools. New native preview geometry, zone catalog and tool cancellation are compiled but still need in-game validation. Installation checks the exact game assembly and DLL fingerprints and refuses replacement while Cities II is running.
+
+## Live test: 0.4.4-coach.1
+
+Passed in a loaded city: compact brief; dynamic zone catalog; services query; nearby road/power discovery; whole-map outside-road graph; checkpoint save; four-cell zoning preview with all four cells unchanged afterward; default-tool restoration; one bounded simulation interval and pause; consumer water/sewage observations.
+
+FAILED: a node-attached water-pipe extension reported complete despite a 10-metre depth mismatch and new endpoint identity. Preview validation accepted a different temporary edge. Both newly created test segments were removed and their absence verified. No repeated placement attempt was made.
+
+0.4.4-coach.2 now limits preview evidence to new created edges (excluding modifications/deletions), checks curve endpoint height as well as node identity, and verifies actual created-edge attachment before reporting completion. Compiled against the installed game assembly. This correction is NOT yet live-tested or installed; replacing the running DLL requires closing the game. Earlier offline checks do not certify this native behaviour.

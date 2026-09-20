@@ -110,21 +110,44 @@ namespace CitiesIIAgentBridge
         {
             var wanted = point.m_OriginalEntity;
             if (Replacement != Entity.Null || !EntityManager.Exists(wanted) || !EntityManager.HasComponent<Game.Net.Node>(wanted)) return;
-            var expected = EntityManager.GetComponentData<Game.Net.Node>(wanted).m_Position;
+            var expected = point.m_Position;
             using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Game.Net.Edge>(), ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<PrefabRef>()))
             using (var edges = q.ToEntityArray(Allocator.Temp)) foreach (var e in edges)
             {
                 if (EntityManager.GetComponentData<PrefabRef>(e).m_Prefab != expectedPrefab) continue;
-                if ((EntityManager.GetComponentData<Temp>(e).m_Flags & TempFlags.Delete) != 0) continue;
+                var temp = EntityManager.GetComponentData<Temp>(e);
+                if ((temp.m_Flags & TempFlags.Delete) != 0 || (temp.m_Flags & TempFlags.Create) == 0 || temp.m_Original != Entity.Null) continue;
                 var edge = EntityManager.GetComponentData<Game.Net.Edge>(e);
                 foreach (var node in new[] { edge.m_Start, edge.m_End })
                 {
                     if (!EntityManager.Exists(node) || !EntityManager.HasComponent<Game.Net.Node>(node)) continue;
                     var original = EntityManager.HasComponent<Temp>(node) ? EntityManager.GetComponentData<Temp>(node).m_Original : node;
-                    if (original == wanted && math.distance(EntityManager.GetComponentData<Game.Net.Node>(node).m_Position, expected) <= 1f) return;
+                    if (original == wanted && math.distance(EntityManager.GetComponentData<Game.Net.Node>(node).m_Position, expected) <= 1f && EntityManager.HasComponent<Game.Net.Curve>(e))
+                    { var curve = EntityManager.GetComponentData<Game.Net.Curve>(e).m_Bezier; var endpoint = node == edge.m_Start ? curve.a : curve.d; if (math.distance(endpoint, expected) <= 1f) return; }
                 }
             }
             throw new InvalidOperationException("attached_node_not_preserved_in_native_preview_inspect_node_height_and_network_do_not_retry_same_geometry");
+        }
+        private void VerifyAppliedAttachment(ControlPoint point, JArray created)
+        {
+            var wanted = point.m_OriginalEntity;
+            if (Replacement != Entity.Null || wanted == Entity.Null) return;
+            // Only node attachment is checked here. Edge attachment has separate native splitting semantics.
+            if (!EntityManager.Exists(wanted) || !EntityManager.HasComponent<Game.Net.Node>(wanted))
+            {
+                if (EntityManager.Exists(wanted) && EntityManager.HasComponent<Game.Net.Edge>(wanted)) return;
+                throw new InvalidOperationException("attachment_entity_changed_after_apply_inspect_createdRoads_do_not_repeat");
+            }
+            foreach (JObject row in created)
+            {
+                var entity = new Entity { Index = (int)row["index"], Version = (int)row["version"] };
+                var edge = EntityManager.GetComponentData<Game.Net.Edge>(entity);
+                if (edge.m_Start != wanted && edge.m_End != wanted) continue;
+                var curve = EntityManager.GetComponentData<Game.Net.Curve>(entity).m_Bezier;
+                var endpoint = edge.m_Start == wanted ? curve.a : curve.d;
+                if (math.distance(endpoint, point.m_Position) <= 1f) return;
+            }
+            throw new InvalidOperationException("attachment_not_verified_after_apply_city_changed_inspect_createdRoads_do_not_repeat");
         }
         protected override void OnStopRunning()
         {
@@ -174,6 +197,7 @@ namespace CitiesIIAgentBridge
                     bool replaced = Replacement != Entity.Null && EntityManager.Exists(Replacement) && EntityManager.HasComponent<PrefabRef>(Replacement) && EntityManager.GetComponentData<PrefabRef>(Replacement).m_Prefab == expectedPrefab;
                     if (replaced) ConstructionAccess.Results[operation]["upgradedEntity"] = NativeBuild.Id(Replacement);
                     if (created.Count == 0 && !replaced) throw new InvalidOperationException("network_change_not_observed");
+                    VerifyAppliedAttachment(start, created); VerifyAppliedAttachment(end, created);
                     Finish("complete");
                 }
             }
