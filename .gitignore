@@ -6,3 +6,10 @@ test-results.txt
 *.zip
 .env
 .env.*
+
+mod/artifacts/
+**/bin/
+**/obj/
+*.dll
+*.pdb
+*.rsp

@@ -1,12 +1,12 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param(
- [ValidateSet('doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
+ [ValidateSet('health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
  [string]$Filter='', [int]$Index=0, [int]$Version=0,
  [double]$X=0, [double]$Z=0, [int]$Radius=120,
  [int]$FromIndex=0,[int]$FromVersion=0,[int]$ToIndex=0,[int]$ToVersion=0,
  [double]$Elevation=0,[double]$Rotation=0,[int]$MaxCost=0,[int]$Reserve=100000,
- [string]$PlanPath='', [string]$OperationId='',
+ [string]$PlanPath='', [string]$OperationId='', [ValidateSet('operation','batch','simulation')][string]$Kind='operation',
  [string]$MailboxPath=(Join-Path $env:LOCALAPPDATA 'CitiesIIAgentBridge'),
  [string]$RecordPath=(Join-Path $PSScriptRoot 'records'),
  [switch]$LibraryOnly
@@ -14,7 +14,7 @@ param(
 $ErrorActionPreference='Stop'
 function Session {
  $s=Get-Content -LiteralPath (Join-Path $MailboxPath 'session.json') -Raw|ConvertFrom-Json -DateKind String
- $age=([DateTimeOffset]::UtcNow-[DateTimeOffset]::Parse($s.heartbeatUtc)).TotalSeconds
+ $age=([DateTimeOffset]::UtcNow-[DateTimeOffset]::Parse($s.heartbeatUtc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AssumeUniversal)).TotalSeconds
  if($s.status -ne 'ready' -or $age -gt 10 -or $age -lt -5){throw 'Bridge heartbeat is stale. Do not send or repeat construction. Load the city and check the mod.'}
  return $s
 }
@@ -64,6 +64,7 @@ function Diagnose($City,$Buildings,$Diagnostics) {
  $issueRows=@($cards|Where-Object {$_.issues.Count -gt 0})
  if($issueRows.Count){$actions.Add('Inspect the listed affected building and its nearby network. Use real connector/node IDs; visual proximity and road access do not prove utility connectivity.')}
  $actions.Add('After one connection change, run settle once, then doctor. Confirm production/processing and consumer fulfillment; no demand means supply remains unproven.')
+ if($City.population -eq 0){$actions.Insert(0,'Population is zero: verify outside road access before adding more utilities or zoning. Use outside with a current city-road node; a camera-radius query cannot check the map boundary.')}
  [ordered]@{city=$City.cityName;money=$City.money;paused=($City.selectedSpeed -eq 0);controlEnabled=$City.controlEnabled;status='inspection_only_supply_not_certified';partial=$partial;utilityTotalsRaw=$utility;persistentShortages=@($Diagnostics.persistentShortages);buildings=$cards;next=$actions.ToArray();notes=@('Uses buildings and diagnostics instead of the broken get_services endpoint.','Raw totals are not MW or m3 without a verified conversion. Capacity is not delivery.','A transformer node alone is not evidence of an external power feed.','A disconnected test pipe/road is not a working network. Native map ruins are excluded.')}
 }
 function Catalog([string]$Text) {
@@ -139,6 +140,17 @@ function ApplyPlan {
 if($LibraryOnly){return}
 try {
  $result=switch($Action) {
+  'health' {
+   $exists=Test-Path (Join-Path $MailboxPath 'session.json');$stopped=Test-Path (Join-Path $MailboxPath 'STOP');$s=$null;$problem=$null
+   try{$s=Session}catch{$problem=$_.Exception.Message}
+   @{ready=($null -ne $s);stopLatched=$stopped;bridgeVersion=$s.modVersion;gameVersion=$s.gameVersion;controls=$s.controlEnabled;problem=$problem;next=if($stopped){'STOP latch is holding the checkbox off. Resume only with owner authorization; never clear it automatically.'}elseif(!$s){'Return from Options to the loaded city. Check game responsiveness and mod loading before sending requests.'}else{'Heartbeat is current. Queued responses still require completion polling.'};compatibility='A ready heartbeat is not build compatibility certification. Installation uses the exact Game.dll fingerprint.'}
+  }
+  'outside' {
+   if($Index -le 0 -or $Version -le 0){throw 'Supply a city-road node -Index and -Version from inspect. Building and prefab IDs are not road nodes.'}
+   $s=Session
+   if($s.modVersion -notlike '0.4.3-coach*'){throw 'Whole-map outside-road diagnosis needs the patched mod 0.4.3-coach.1. A camera-radius search cannot establish outside connectivity on this older mod.'}
+   Call get_outside_connections @{index=$Index;version=$Version}
+  }
   'doctor' {
    $s=Session; $city=Call get_city_state; $buildings=Call get_buildings
    $diag=$null; $diagnosticError=$null
@@ -182,7 +194,7 @@ try {
    WritePlan $plan
   }
   'apply' {ApplyPlan}
-  'wait' {if(!$OperationId){throw 'Supply the original -OperationId.'};Await $OperationId}
+  'wait' {if(!$OperationId){throw 'Supply the original -OperationId.'};$poll=@{operation='get_operation';batch='get_batch';simulation='get_simulation_step'}[$Kind];Await $OperationId $poll}
   'settle' {
    $null=Control
    $op=Call simulate_step @{frames=512;wallSeconds=5;stallSeconds=3;speed=1;cashFloor=$Reserve;stopOnNewShortage=$true}

@@ -1,6 +1,6 @@
 # Utility Coach for Cities II Agent Bridge
 
-Give your agent this folder and ask it to read **AGENTS.md**, then run **doctor**. This is a separate helper kit; it does not replace the game mod or alter the original release package.
+Give your agent this folder and ask it to read **AGENTS.md**, then run **doctor**. This helper kit works alongside the game mod. Optional patched mod source is now included under mod/; see INSTALL.md. The original downloaded release package remains unchanged.
 
 Requires Windows, PowerShell **7.5+**, and an already-working Cities II Agent Bridge mailbox. No Python, npm, API keys, model calls or extra packages. The supplied client fixes the timestamp parsing error observed with PowerShell 7.6. This does not fix or certify game-version compatibility.
 
@@ -51,4 +51,6 @@ See **UTILITY-RECIPES.md** for the actual electricity/water/sewage decision tree
 
 Raw responses are retained locally under `records/`. They can contain city names and positions; nothing is uploaded. To recover from changes, load a verified checkpoint through the game's normal Load Game menu.
 
-The last test deliberately left STOP latched. Reading a paused city still works. Resuming control requires renewed owner authorization, removal of only the STOP file and re-enabling Options → Cities II Agent Bridge → Allow local bridge controls after loading the city. The helper never does this automatically.
+If a previous test left STOP latched, reading a paused city still works. Resuming control requires renewed owner authorization, removal of only the STOP file and re-enabling Options → Cities II Agent Bridge → Allow local bridge controls after loading the city. The helper never does this automatically.
+
+For one-call completion polling use agent.ps1. For non-invasive heartbeat/STOP diagnosis use coach.ps1 health. For whole-map road access use coach.ps1 outside with the patched DLL. See COMMANDS.md for canonical response keys and payload limits.

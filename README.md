@@ -2,11 +2,11 @@
 
 A practical helper kit for AI agents using [Cities II Agent Bridge](https://github.com/FTPAiYT/cities2-agent-bridge-ndc). It turns low-level utility commands into compact diagnostics, checked plans, and clear next steps.
 
-**This is a companion helper, not the game mod or an MCP server.** You need your own installed Cities: Skylines II, a compatible working bridge, and PowerShell 7.5 or later.
+This repository includes the helper kit and an optional patched mod source build. It is not an MCP server. You need your own installed Cities: Skylines II and PowerShell 7.5 or later. See [INSTALL.md](INSTALL.md) for the fixed entry points and mod installation.
 
 ## Start
 
-Read [START-HERE.md](START-HERE.md). Agents should first read [AGENTS.md](AGENTS.md), then run:
+Use [agent.ps1](agent.ps1) to submit once and automatically wait for completion. See [COMMANDS.md](COMMANDS.md) for exact result keys and the whole-map outside-road check. Read [START-HERE.md](START-HERE.md). Agents should first read [AGENTS.md](AGENTS.md), then run:
 
 ```powershell
 pwsh -NoProfile -File ./coach.ps1 doctor
@@ -25,16 +25,17 @@ The helper never clears STOP or turns game controls on. Plans do not construct a
 
 ## Validation
 
-22 offline checks passed, plus live discovery, diagnosis, proposal creation, existing-path detection, and STOP refusal. Successful application through this new wrapper was tested with simulated bridge responses; actual utility delivery remains unverified. See [VALIDATION.md](VALIDATION.md) for boundaries.
+132 offline checks passed across the mod protocol, helper, and client suites. The patched mod compiles against the local game assemblies; its UI and whole-map graph changes still need a fresh in-game session. Earlier helper discovery/diagnosis was live-tested, not the newly built DLL. See [VALIDATION.md](VALIDATION.md) for boundaries.
 
 Run the offline checks:
 
 ```powershell
 pwsh -NoProfile -File ./test-coach.ps1
+pwsh -NoProfile -File ./test-client.ps1
 ```
 
 No model API calls, Python, npm, credentials, game assemblies, saves, or private city records are required or included.
 
 ## Upstream
 
-`bridge-client.ps1` is derived from the client in [FTPAiYT/cities2-agent-bridge-ndc](https://github.com/FTPAiYT/cities2-agent-bridge-ndc), community release 0.4.2, with a local timestamp-parsing correction. This repository does not claim ownership of upstream code or change its applicable terms. The original mod is distributed separately by its author.
+`bridge-client.ps1` is derived from the client in [FTPAiYT/cities2-agent-bridge-ndc](https://github.com/FTPAiYT/cities2-agent-bridge-ndc), community release 0.4.2, with transport corrections. The mod source is also derived from that upstream package; modifications are described in FIXES.md. This repository does not claim ownership of upstream code or change its applicable terms. The original mod is distributed separately by its author.

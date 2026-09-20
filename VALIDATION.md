@@ -1,20 +1,21 @@
-# Validation — 20 September 2026
+# Validation — reliability update
 
-22 offline checks passed. They cover missing/partial diagnostics, exclusion of native decorations, no false supply certification, transformer classification, stale/expired plans, reserve limits, demolition refusal, node layer/type/length validation, prevention of double elevation offsets, checkpoint-before-build ordering, operation polling, replay prevention after renaming a plan, and timeout handling without resubmission.
+132 offline checks passed:
 
-Live-tested against the already-running bridge in a local test city:
+- 90 mod tests: mailbox dispatch/replay, simulation bounds, geometry, object placement safety, Windows file-lock recovery, and real PowerShell client timeout/polling.
+- 22 utility-coach tests: diagnosis, reserves, node validation, plan identity, checkpoint handling, duplicate protection and timeout handling.
+- 20 transport/wrapper tests: cultures en-GB/en-US/de-DE, timezone preservation, byte limits, 169-point terrain query chunking, ordering, and one-submit async polling.
 
-- doctor: correct paused state, funds, disabled controls, STOP latch, capacity/production and missing water/sewage capacity.
-- catalog: useful water assets and lock state without hundreds of waterfront houses.
-- sites: water-tower candidate returned with prefab details.
-- inspect: transformer and underground pipe node plus nearby named network edges.
-- building-plan: resolved a current water-tower prefab and wrote a proposal without construction.
-- connection-plan: recognized the existing physical pipe path and refused to propose a duplicate.
-- apply with STOP: refused before construction.
+The patched 0.4.3-coach.1 DLL compiles against the local installation reporting game version 1.3.6f1. Its build manifest contains the exact Game.dll and output DLL fingerprints, and installer CheckOnly passed.
 
-Funds were unchanged and the game remained paused. STOP remained latched. No new construction or simulation was performed while developing this kit.
+Runtime validation of the NEW DLL is pending a fresh game session. In particular, native tool panel behavior, granular service errors, native placement reasons, and whole-map outside-road detection are not yet live-verified. The earlier helper kit was live-tested for discovery, diagnosis, proposal creation and STOP refusal; those results do not substitute for new-mod testing. Real utility delivery and actual resident immigration remain unproven.
 
-The apply wrapper's successful save/submit/wait sequence is tested with simulated bridge responses, not new live construction. The earlier raw-bridge tests demonstrated real construction, but that is not the same as live-testing the new wrapper. Node-to-node connection construction, arbitrary utility routing, shoreline/resource suitability, actual water/sewage delivery, and powering a populated neighborhood remain unverified by this helper kit.
+Test commands:
 
-Source: bridge-client.ps1 is a local derivative of the client supplied by https://github.com/FTPAiYT/cities2-agent-bridge-ndc (0.4.2 community package), with heartbeat timestamps preserved as strings. The original package remains separate and unchanged. No game DLLs, saves, private city records or mailbox data are included in the shareable ZIP.
+```powershell
+pwsh -NoProfile -File ./test-coach.ps1
+pwsh -NoProfile -File ./test-client.ps1
+dotnet run --project ./mod/tests/MailboxTests.csproj -p:GamePath='YOUR_ACTUAL_GAME_FOLDER'
+```
 
+CIAB_TEST_PWSH may point to a PowerShell executable if pwsh is not on PATH. No game or private city records are included in this repository. Source is derived from FTPAiYT/cities2-agent-bridge-ndc 0.4.2; see FIXES.md for modifications.
