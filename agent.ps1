@@ -40,6 +40,10 @@ try {
   if($reply.session -ne $envelope.session -or $reply.citySession -ne $envelope.citySession){throw 'City/session changed while waiting. Outcome unknown; do not replay.'}
   $result=$reply.result
  }
+ if($result.kind -eq 'zoning' -and $result.status -eq 'complete'){
+  $guidance=if($result.previewOnly){'Preview only: nothing zoned. Review previewCells before applying.'}else{'Zoning applied. The house/theme palette may remain open; it is not a confirmation dialog. Verify changed cells use the intended usable zone. Run coach.ps1 settle once for authorized simulation, then inspect. Do not wait for growth while paused or keep clicking housing icons.'}
+  $result|Add-Member -NotePropertyName nextAction -NotePropertyValue $guidance -Force
+ }
  # Preserve canonical keys; add unambiguous aliases for older binaries.
  if($Command -in @('get_batch','batch_execute','execute_neighborhood')){
   if(!$result.PSObject.Properties['completedCount']){$result|Add-Member completedCount $result.completed}

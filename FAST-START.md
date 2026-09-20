@@ -37,3 +37,9 @@ Water needs a working pump/tower, sewage needs a working outlet/treatment facili
 `agent.ps1` normally waits ten seconds, polls once per second and prints progress every five seconds while polling. A transport request may separately take up to fifteen seconds, so the total is not a strict ten-second end-to-end deadline. Native menus can suspend processing: return to the city rather than queue more work.
 
 `pending_do_not_resubmit` means poll the supplied ID. `stagnant_no_progress` means stop simulation experiments. `tool_busy` means inspect/cancel the tool. `invalid_zone` means discover usable zones. Null/missing results are errors, never success. Raw responses are saved in records; do not reread all history or dump huge terrain/zoning arrays into chat.
+
+## Housing palette stays open after zoning
+
+The panel with house icons and regional/theme buttons is the zoning palette. In the live reproduction, four cells were successfully assigned NA Residential Low, the operation finished, and the native tool returned to default while this panel remained visible. Simulation advanced 312 frames with it still open. It was not blocking confirmation.
+
+After zoning, inspect changedCells and the actual cell zones. For non-preview completion, run one authorized settle interval instead of waiting for growth while paused. The palette can be closed with its X; selecting another house icon changes the tool choice, not confirmation of the completed zoning. Do not click randomly. This observation does not prove what happened in every older agent session, especially one that selected a generic zone with zero growables.

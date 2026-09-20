@@ -42,3 +42,7 @@ FAILED: a node-attached water-pipe extension reported complete despite a 10-metr
 Confirmed loaded version and fresh session. Saved a checkpoint, then submitted one 20-metre extension from a rediscovered live Small Water Pipe endpoint at elevation zero. The operation failed before apply with attached_node_not_preserved_in_native_preview_inspect_node_height_and_network_do_not_retry_same_geometry. The same three nearby water edges, endpoint identities and lengths remained; money was unchanged. The tool returned to DefaultToolSystem with no active operation.
 
 This verifies rejection of the reproduced double-burial case, not successful native pipe attachment in general. The underlying native depth/snap issue remains unresolved. No second speculative placement was attempted.
+
+## Housing palette live reproduction
+
+User identified the residential icon/theme palette left open after a four-cell zone_rectangle operation. All four cells were read back as the selected residential zone and the tool returned to default. A bounded simulation step advanced 312 frames with the palette still open. Therefore the reproduced panel did not require a confirmation click or block simulation. Closed its X afterward. The helper now adds explicit zoning nextAction guidance distinguishing preview from applied zoning and prompting one bounded simulation step when authorized. No claim of new house growth is made from this test.
