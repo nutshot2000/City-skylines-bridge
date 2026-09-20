@@ -22,3 +22,9 @@ CIAB_TEST_PWSH may point to a PowerShell executable if pwsh is not on PATH. No g
 
 
 Live follow-up: whole-map outside-road traversal returned a complete disconnected result from a populated road graph. Service listing still failed in coach.1; coach.2 adds a missing null-prefab guard and compiles, but requires another load before it can be verified. No claim of a fully fixed service listing is made.
+
+## 0.4.4-coach.1 offline validation
+
+Compiled against the installed Game.dll. 135 checks passed: 91 native-independent mailbox/policy/recovery checks, 22 helper checks, 22 client checks. New regressions cover null dispatch, null client result, and queued result without an operation ID. Existing checks cover retry behaviour, one-submit polling, timestamp cultures and request chunking.
+
+These tests do not exercise Unity's live tools. New native preview geometry, zone catalog and tool cancellation are compiled but still need in-game validation. Installation checks the exact game assembly and DLL fingerprints and refuses replacement while Cities II is running.

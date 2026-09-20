@@ -45,7 +45,7 @@ namespace CitiesIIAgentBridge
             simulationWindow = window; simulationClock = Stopwatch.StartNew(); nextSimulationSample = 0;
             if ((bool?)args["acknowledgeNoProgress"] == true) stagnantSteps = 0;
             var result = ConstructionAccess.Results[simulationOperation];
-            result["status"] = "running"; result["before"] = simulationBefore;
+            result["citySession"] = citySession; result["status"] = "running"; result["before"] = simulationBefore;
             result["bounds"] = new JObject { ["frames"] = frames, ["wallSeconds"] = wall, ["stallSeconds"] = stall };
             sim.selectedSpeed = speed;
             return ConstructionAccess.Status(simulationOperation);

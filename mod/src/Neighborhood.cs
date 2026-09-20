@@ -48,7 +48,7 @@ namespace CitiesIIAgentBridge
                 var step=(JObject)steps[i];var a=(JObject)step["args"];string command=(string)step["command"];
                 try
                 {
-                    if(command=="zone_rectangle") { BuildPrefab<ZonePrefab>(w,a);var p=BuildPoint(w,(JObject)a["start"]);var q=BuildPoint(w,(JObject)a["end"]);if(math.distance(p.m_Position,q.m_Position)>500)throw new ArgumentException("zoning_diagonal_exceeds_500");continue; }
+                    if(command=="zone_rectangle") { var zone=BuildPrefab<ZonePrefab>(w,a);if(GrowableCount(w,w.GetExistingSystemManaged<PrefabSystem>().GetEntity(zone))==0)throw new ArgumentException("zone_has_no_growables_use_get_zone_catalog");var p=BuildPoint(w,(JObject)a["start"]);var q=BuildPoint(w,(JObject)a["end"]);if(!w.EntityManager.HasComponent<Game.Zones.Block>(p.m_OriginalEntity))throw new ArgumentException("zone_plan_requires_existing_block_anchor_add_zoning_after_roads");if(math.distance(p.m_Position,q.m_Position)>500)throw new ArgumentException("zoning_diagonal_exceeds_500");continue; }
                     int max=RequiredInt(a,"maxCost");if(max<0 || max>1000000)throw new ArgumentException("invalid_step_budget");upper=checked(upper+max);
                     double[][] shape=null;
                     if(command=="place_building")

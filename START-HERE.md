@@ -1,6 +1,6 @@
 # Utility Coach for Cities II Agent Bridge
 
-Give your agent this folder and ask it to read **AGENTS.md**, then run **doctor**. This helper kit works alongside the game mod. Optional patched mod source is now included under mod/; see INSTALL.md. The original downloaded release package remains unchanged.
+Give your agent this folder and ask it to read **AGENTS.md**, then follow **FAST-START.md** and run **brief**. This helper kit works alongside the game mod. Optional patched mod source is now included under mod/; see INSTALL.md. The original downloaded release package remains unchanged.
 
 Requires Windows, PowerShell **7.5+**, and an already-working Cities II Agent Bridge mailbox. No Python, npm, API keys, model calls or extra packages. The supplied client fixes the timestamp parsing error observed with PowerShell 7.6. This does not fix or certify game-version compatibility.
 
@@ -13,7 +13,7 @@ pwsh -NoProfile -File ./coach.ps1 catalog -Filter Sewage
 pwsh -NoProfile -File ./coach.ps1 catalog -Filter Power
 ```
 
-`doctor` gives a compact summary, issues and next steps. It excludes native map decorations and avoids the broken `get_services` endpoint. `catalog` intentionally lists common utility assets rather than every building containing “water.” It is a name-based convenience filter, not an exhaustive or authoritative capability classifier. If a modded asset is missing, discover it using the original bridge and inspect its details.
+`doctor` gives a compact summary, issues and next steps. It excludes native map decorations and uses building-level observations alongside city diagnostics. `catalog` intentionally lists common utility assets rather than every building containing “water.” It is a name-based convenience filter, not an exhaustive or authoritative capability classifier. If a modded asset is missing, discover it using the original bridge and inspect its details.
 
 | Command | Purpose | Changes the city? |
 |---|---|---|

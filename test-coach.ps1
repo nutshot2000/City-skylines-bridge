@@ -58,6 +58,6 @@ $p.id=[guid]::NewGuid().ToString('N');$PlanPath=Join-Path $tmp 'save-failure.jso
 Reject {ApplyPlan} 'failed checkpoint prevents construction'
 Check (@($script:calls|Where-Object {$_ -eq 'place_building'}).Count -eq 1) 'save failure did not dispatch construction'
 $script:buildStatus='running';$r=Await 'build' 'get_operation' 0
-Check ($r.status -eq 'outcome_unknown' -and $r.id -eq 'build') 'poll deadline retains original operation ID'
+Check ($r.status -eq 'pending_do_not_resubmit' -and $r.id -eq 'build') 'poll deadline retains original operation ID'
 Check (@($script:calls|Where-Object {$_ -eq 'place_building'}).Count -eq 1) 'poll timeout never resubmits mutation'
 Write-Output "$script:checks checks passed. No game commands sent. Fixtures: $tmp"

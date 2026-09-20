@@ -14,6 +14,7 @@ namespace CitiesIIAgentBridge
         private JObject OutsideConnections(JObject args)
         {
             var w = RequireCity(); var em = w.EntityManager;
+            if (args["index"] == null || args["version"] == null) throw new ArgumentException("road_node_index_and_version_required_from_get_network_not_building_or_prefab");
             var start = new Entity { Index = RequiredInt(args, "index"), Version = RequiredInt(args, "version") };
             if (!em.Exists(start) || !em.HasComponent<Node>(start)) throw new ArgumentException("start_must_be_current_road_node");
             var outside = new HashSet<Entity>();

@@ -1,7 +1,7 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param(
- [ValidateSet('health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
+ [ValidateSet('brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
  [string]$Filter='', [int]$Index=0, [int]$Version=0,
  [double]$X=0, [double]$Z=0, [int]$Radius=120,
  [int]$FromIndex=0,[int]$FromVersion=0,[int]$ToIndex=0,[int]$ToVersion=0,
@@ -12,8 +12,26 @@ param(
  [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
+
+
+function Read-MailboxText([string]$Path) {
+    # Permit atomic replacement while reading a complete snapshot from the open handle.
+    $stream = [IO.FileStream]::new($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read,
+        ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    $reader = $null
+    try {
+        $reader = [IO.StreamReader]::new($stream, [Text.Encoding]::UTF8, $true)
+        return $reader.ReadToEnd()
+    } finally {
+        if ($null -ne $reader) { $reader.Dispose() } else { $stream.Dispose() }
+    }
+}
 function Session {
- $s=Get-Content -LiteralPath (Join-Path $MailboxPath 'session.json') -Raw|ConvertFrom-Json -DateKind String
+ $s=$null
+ for($attempt=0;$attempt -lt 4;$attempt++){
+  try {$s=Read-MailboxText (Join-Path $MailboxPath 'session.json')|ConvertFrom-Json -DateKind String;break}
+  catch {if($attempt -eq 3){throw};Start-Sleep -Milliseconds 75}
+ }
  $age=([DateTimeOffset]::UtcNow-[DateTimeOffset]::Parse($s.heartbeatUtc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::AssumeUniversal)).TotalSeconds
  if($s.status -ne 'ready' -or $age -gt 10 -or $age -lt -5){throw 'Bridge heartbeat is stale. Do not send or repeat construction. Load the city and check the mod.'}
  return $s
@@ -28,18 +46,19 @@ function Call([string]$Command,[hashtable]$Data=@{}) {
  $r=($text -join "`n")|ConvertFrom-Json -DateKind String
  New-Item -ItemType Directory -Force $RecordPath|Out-Null
  $r|ConvertTo-Json -Depth 60|Set-Content (Join-Path $RecordPath (([guid]::NewGuid().ToString('N'))+'-'+$Command+'.json'))
- if(!$r.ok){throw "$Command failed: $($r.error). Do not blindly retry a mutation."}
+ if($r.ok -and $null -eq $r.result){throw "result_missing_outcome_unknown_do_not_repeat"}; if(!$r.ok){throw "$Command failed: $($r.error). Do not blindly retry a mutation."}
  return $r.result
 }
-function Await([string]$Id,[string]$Kind='get_operation',[int]$Seconds=45) {
- $s=Session; $end=[DateTime]::UtcNow.AddSeconds($Seconds)
+function Await([string]$Id,[string]$Kind='get_operation',[int]$Seconds=10) {
+ $s=Session; $end=[DateTime]::UtcNow.AddSeconds($Seconds);$progressAt=[DateTime]::UtcNow.AddSeconds(5)
  do {
   if((Session).citySession -ne $s.citySession){throw 'City changed while waiting. Outcome unknown; inspect instead of replaying.'}
   $r=Call $Kind @{id=$Id}
   if($r.status -in @('complete','failed','interrupted')){return $r}
-  Start-Sleep -Milliseconds 200
+  if([DateTime]::UtcNow -ge $progressAt){[Console]::Error.WriteLine("Waiting for $Kind $Id ($($r.status)); do not repeat the original action.");$progressAt=[DateTime]::UtcNow.AddSeconds(5)}
+  Start-Sleep -Milliseconds 1000
  } while([DateTime]::UtcNow -lt $end)
- return @{status='outcome_unknown';id=$Id;next="Poll this same operation ID. Never resend construction: $Id"}
+ return @{status='pending_do_not_resubmit';id=$Id;next="Poll this same operation ID. Never resend construction: $Id"}
 }
 function CompactBuilding($b) {
  $roles=@(); $components=@($b.components)
@@ -65,7 +84,7 @@ function Diagnose($City,$Buildings,$Diagnostics) {
  if($issueRows.Count){$actions.Add('Inspect the listed affected building and its nearby network. Use real connector/node IDs; visual proximity and road access do not prove utility connectivity.')}
  $actions.Add('After one connection change, run settle once, then doctor. Confirm production/processing and consumer fulfillment; no demand means supply remains unproven.')
  if($City.population -eq 0){$actions.Insert(0,'Population is zero: verify outside road access before adding more utilities or zoning. Use outside with a current city-road node; a camera-radius query cannot check the map boundary.')}
- [ordered]@{city=$City.cityName;money=$City.money;paused=($City.selectedSpeed -eq 0);controlEnabled=$City.controlEnabled;status='inspection_only_supply_not_certified';partial=$partial;utilityTotalsRaw=$utility;persistentShortages=@($Diagnostics.persistentShortages);buildings=$cards;next=$actions.ToArray();notes=@('Uses buildings and diagnostics instead of the broken get_services endpoint.','Raw totals are not MW or m3 without a verified conversion. Capacity is not delivery.','A transformer node alone is not evidence of an external power feed.','A disconnected test pipe/road is not a working network. Native map ruins are excluded.')}
+ [ordered]@{city=$City.cityName;money=$City.money;paused=($City.selectedSpeed -eq 0);controlEnabled=$City.controlEnabled;status='inspection_only_supply_not_certified';partial=$partial;utilityTotalsRaw=$utility;persistentShortages=@($Diagnostics.persistentShortages);buildings=$cards;next=$actions.ToArray();notes=@('Uses building-level evidence alongside city diagnostics.','Raw totals are not MW or m3 without a verified conversion. Capacity is not delivery.','A transformer node alone is not evidence of an external power feed.','A disconnected test pipe/road is not a working network. Native map ruins are excluded.')}
 }
 function Catalog([string]$Text) {
  $p=Call get_build_prefabs @{filter=$Text}
@@ -140,6 +159,15 @@ function ApplyPlan {
 if($LibraryOnly){return}
 try {
  $result=switch($Action) {
+  'zones' {Call get_zone_catalog}
+  'nearby' {if(!$PSBoundParameters.ContainsKey('X') -or !$PSBoundParameters.ContainsKey('Z')){throw 'Supply -X and -Z from current city observations.'};Call get_nearby_infrastructure @{x=$X;z=$Z}}
+  'brief' {
+   $s=Session;$t=Call get_tool_status
+   if($t.simulationRunning -or $t.batchRunning -or $t.operationId){@{status='pending_do_not_resubmit';tool=$t;next='Poll the original operation or batch. Do not run analysis or repeat construction.'};break}
+   $city=Call get_city_state
+   if((Session).citySession -ne $s.citySession){throw 'City changed; discard snapshot.'}
+   @{city=$city.cityName;population=$city.population;money=$city.money;tool=$t;next=if(!$s.controlEnabled){'Enable authorized controls in Options and close the menu.'}elseif(!$t.readyForConstruction){'Poll the original operation. For a stranded native tool use cancel_tool once, then inspect.'}elseif($city.population -eq 0){'Check zones (usable=true) and outside road access before adding utilities. Read FAST-START.md.'}else{'Choose one issue; doctor gives utility evidence. One change, one settle, then report.'}}
+  }
   'health' {
    $exists=Test-Path (Join-Path $MailboxPath 'session.json');$stopped=Test-Path (Join-Path $MailboxPath 'STOP');$s=$null;$problem=$null
    try{$s=Session}catch{$problem=$_.Exception.Message}
@@ -148,7 +176,7 @@ try {
   'outside' {
    if($Index -le 0 -or $Version -le 0){throw 'Supply a city-road node -Index and -Version from inspect. Building and prefab IDs are not road nodes.'}
    $s=Session
-   if($s.modVersion -notlike '0.4.3-coach*'){throw 'Whole-map outside-road diagnosis needs the patched mod 0.4.3-coach.1. A camera-radius search cannot establish outside connectivity on this older mod.'}
+   if((Call get_capabilities).read -notcontains 'get_outside_connections'){throw 'Whole-map outside-road diagnosis needs the patched mod 0.4.3-coach.1. A camera-radius search cannot establish outside connectivity on this older mod.'}
    Call get_outside_connections @{index=$Index;version=$Version}
   }
   'doctor' {
@@ -199,12 +227,12 @@ try {
    $null=Control
    $op=Call simulate_step @{frames=512;wallSeconds=5;stallSeconds=3;speed=1;cashFloor=$Reserve;stopOnNewShortage=$true}
    $done=Await $op.id 'get_simulation_step' 12
-   if($done.status -eq 'outcome_unknown'){ $cancel=Call cancel_simulation_step; return @{status='review_needed';cancellation=$cancel;next='Inspect pause state; do not run another interval automatically.'} }
+   if($done.status -eq 'pending_do_not_resubmit'){ $cancel=Call cancel_simulation_step; return @{status='review_needed';cancellation=$cancel;operationId=$op.id;next='Inspect pause state; do not run another interval automatically.'} }
    @{status=$done.status;reason=$done.reason;paused=$done.paused;advancedFrames=$done.advancedFrames;delta=$done.delta;next='Run doctor. This short interval may be insufficient; unchanged readings are inconclusive, not proof of success.'}
   }
  }
  $result|ConvertTo-Json -Depth 40
 } catch {
- @{status='blocked_or_unknown';error=$_.Exception.Message;next='Fix the stated precondition. If a request may have been sent, inspect its response/operation before doing anything again.'}|ConvertTo-Json -Depth 5
+ @{status=if($_.Exception.Message -match 'stagnant|reassess_required'){'stagnant_no_progress'}elseif($_.Exception.Message -match 'zone_has_no_growables|use_zoning_for_growables'){'invalid_zone'}elseif($_.Exception.Message -match 'finish_or_cancel|construction_busy|tool_operation'){'tool_busy'}else{'blocked_or_unknown'};error=$_.Exception.Message;next='Fix the stated precondition. If a request may have been sent, inspect its response/operation before doing anything again.'}|ConvertTo-Json -Depth 5
  exit 1
 }

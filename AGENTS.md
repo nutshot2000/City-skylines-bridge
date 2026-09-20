@@ -2,7 +2,7 @@
 
 Your job is to establish and verify one utility chain at a time. Do not invent prefab IDs, entity IDs, coordinates, unlocks, available funds or a successful result.
 
-1. Read START-HERE.md and UTILITY-RECIPES.md. Run `coach.ps1 doctor` first.
+1. Read FAST-START.md. Run `coach.ps1 brief` first. Use at most six helper calls or 45 seconds before replying with progress. Stop after two identical failures; do not silently loop. Read UTILITY-RECIPES.md only for the relevant utility chain.
 2. Preserve the owner's city and scope. Helpers do not authorize gameplay. Never restart the game, bypass compatibility checks, clear STOP, demolish existing assets or import a new save without the appropriate user authorization. Do not repeatedly ask when the owner has already authorized the scoped work.
 3. Use exactly one controlling agent. Run no other bridge mutations concurrently.
 4. Work paused. Queries may pause the game. During `settle`, let its status polling finish; do not run other analysis commands.

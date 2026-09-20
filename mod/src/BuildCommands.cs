@@ -33,7 +33,7 @@ namespace CitiesIIAgentBridge
         {
             var em = w.EntityManager; var e = new Entity { Index = RequiredInt(args, "prefabIndex"), Version = RequiredInt(args, "prefabVersion") };
             if (!em.Exists(e) || IsPrefabLocked(em, e)) throw new ArgumentException("prefab_stale_or_locked");
-            if (!w.GetExistingSystemManaged<PrefabSystem>().TryGetPrefab<T>(e, out var p)) throw new ArgumentException("incorrect_prefab_type");
+            if (!w.GetExistingSystemManaged<PrefabSystem>().TryGetPrefab<T>(e, out var p) || p == null) throw new ArgumentException("incorrect_prefab_type");
             return p;
         }
         private ControlPoint BuildPoint(World w, JObject args)
@@ -88,7 +88,9 @@ namespace CitiesIIAgentBridge
             var w = RequireCity(); CheckBuildTool(w);
             var p = BuildPrefab<ZonePrefab>(w, args); var a = BuildPoint(w, args["start"] as JObject); var b = BuildPoint(w, args["end"] as JObject);
             if (math.distance(a.m_Position, b.m_Position) > 500) throw new ArgumentException("zoning_rectangle_too_large");
-            var zoneTool = w.GetExistingSystemManaged<BridgeZoneTool>(); zoneTool.Dezone = (bool?)args["dezone"] == true; zoneTool.Begin(p, a, b);
+            if ((bool?)args["dezone"] != true && GrowableCount(w, w.GetExistingSystemManaged<PrefabSystem>().GetEntity(p)) == 0) throw new ArgumentException("zone_has_no_growables_use_get_zone_catalog");
+            if (!w.EntityManager.HasComponent<Block>(a.m_OriginalEntity)) throw new ArgumentException("start_requires_zone_block_index_and_version_from_get_zone_cells");
+            var zoneTool = w.GetExistingSystemManaged<BridgeZoneTool>(); zoneTool.PreviewOnly = (bool?)args["previewOnly"] == true; zoneTool.Dezone = (bool?)args["dezone"] == true; zoneTool.Begin(p, a, b);
             return ConstructionAccess.Status(ConstructionAccess.Active);
         }
         private JObject Network(JObject args)
@@ -102,8 +104,8 @@ namespace CitiesIIAgentBridge
                 var n = em.GetComponentData<Game.Net.Node>(e); if (math.distance(n.m_Position.xz, center.xz) > radius) continue;
                 var edges = new JArray();
                 if (em.HasBuffer<Game.Net.ConnectedEdge>(e)) foreach (var edge in em.GetBuffer<Game.Net.ConnectedEdge>(e, true))
-                    edges.Add(new JObject { ["index"] = edge.m_Edge.Index, ["version"] = edge.m_Edge.Version });
-                rows.Add(new JObject { ["index"] = e.Index, ["version"] = e.Version, ["position"] = Vector(n.m_Position), ["edges"] = edges });
+                    if (em.Exists(edge.m_Edge) && !em.HasComponent<Temp>(edge.m_Edge) && !em.HasComponent<Game.Common.Deleted>(edge.m_Edge)) edges.Add(new JObject { ["index"] = edge.m_Edge.Index, ["version"] = edge.m_Edge.Version });
+                rows.Add(new JObject { ["index"] = e.Index, ["version"] = e.Version, ["position"] = Vector(n.m_Position), ["edges"] = edges, ["liveDegree"] = edges.Count, ["orphan"] = edges.Count == 0 });
                 if (rows.Count >= 512) break;
             }
             return new JObject { ["nodes"] = rows };

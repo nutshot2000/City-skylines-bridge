@@ -42,7 +42,7 @@
 - `index/version` together identify the current entity. A recycled index with a new version is a different entity.
 - `connection-plan` accepts existing network **nodes** only. `inspect` lists named edges and their start/end nodes, which lets you identify the appropriate layer. It does not choose the nearest node automatically.
 - A building's producer/consumer reference can point to an **edge**. Use nearby edge data to discover that edge's endpoints, or the original bridge's edge-attachment workflow with an explicitly checked curvePosition. The helper does not invent edge attachment points.
-- The supplied bridge resolves a node's absolute height and then adds `elevation`. Applying -10 to an already-underground node can shift the proposal down again. Node-to-node helper plans preserve heights using elevation 0 and let native validation decide feasibility.
+- The supplied bridge resolves a node's absolute height and then adds `elevation`. Applying -10 to an already-underground node can shift the proposal down again. Node-to-node helper plans request elevation 0, but the native tool can still apply burial again. The patched DLL checks preview endpoint identity and height before applying and rejects a mismatch. Do not blindly retry or drop endpoint IDs to bypass this check.
 - A free-floating pipe created from terrain points is a different operation: inspect its allowed elevation range first. Do not reuse the node-to-node rule blindly for terrain-based construction.
 - If native placement rejects the route, inspect its error. Do not bypass preview, set ignore-errors, or try random depths until something appears.
 

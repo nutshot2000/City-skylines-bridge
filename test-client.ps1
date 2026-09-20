@@ -33,6 +33,8 @@ $job=Start-Job -ArgumentList $root -ScriptBlock {
    $q=Get-Content $file -Raw|ConvertFrom-Json
    switch($q.command){
     'sample_terrain' {$chunks++;$result=@{samples=@($q.args.points|ForEach-Object {@{position=$_;waterDepth=0}})}}
+    'ping' {$result=$null}
+    'get_tool_status' {$result=@{status='queued'}}
     'save_checkpoint' {$mutations++;$result=@{id='op';status='queued';kind='save'}}
     'get_operation' {$polls++;$result=@{id='op';status=if($polls -ge 2){'complete'}else{'queued'};kind='save'}}
     default {throw "Unexpected command $($q.command)"}
@@ -54,6 +56,10 @@ try {
  Check (@(Get-ChildItem "$root/requests/*.json"|Where-Object Length -gt 16384).Count -eq 0) 'all chunk packets fit the actual byte cap'
  $r=(& "$PSScriptRoot/agent.ps1" -Command save_checkpoint -MailboxPath $root -RecordPath "$root/records")|ConvertFrom-Json
  Check ($r.status -eq 'complete') 'agent wrapper waits for operation completion'
+ $r=(& "$PSScriptRoot/agent.ps1" -Command ping -MailboxPath $root -RecordPath "$root/records")|ConvertFrom-Json
+ Check ($r.status -eq 'failed_or_outcome_unknown' -and $r.error -match 'result_missing') 'null result cannot appear successful'
+ $r=(& "$PSScriptRoot/agent.ps1" -Command get_tool_status -MailboxPath $root -RecordPath "$root/records")|ConvertFrom-Json
+ Check ($r.status -eq 'failed_or_outcome_unknown' -and $r.error -match 'operation_id_missing') 'queued result without ID is not completion'
  New-Item -ItemType File "$root/done"|Out-Null
  $stats=Receive-Job $job -Wait
  Check ($stats.mutations -eq 1 -and $stats.polls -eq 2) 'wrapper sends mutation once and polls original ID'

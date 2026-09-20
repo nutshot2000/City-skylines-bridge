@@ -26,3 +26,17 @@
 A frozen Unity main thread cannot run its own watchdog; the existing 20-second construction deadline only works while callbacks execute. Missing UI assets, placement rejection and a hard hang are not treated as the same proven cause. No game restart, save load, STOP clearing, or compatibility-check bypass is automated.
 
 Upstream's documented game target and the locally reported game version are different facts. This fork builds against the supplied local Game.dll and records its hash; it does not claim upstream 1.6.0f1 runtime validation for a 1.3.6f1 installation.
+
+## 0.4.4-coach.1: agent feedback fixes
+
+- Dynamic growable counts and usable zone catalog; reject empty generic zones and manual growable placement.
+- Block-anchored zoning with native changed-cell preview (previewOnly).
+- Before applying networks, require requested attached node identity and height in the native preview. This blocks the reported double-burial failure; it does not automatically repair native snapping.
+- Report orphan nodes; do not automatically delete city geometry.
+- Earlier simulation IDs remain readable in the current city; null dispatch/results and queued responses without IDs fail explicitly.
+- Tool status/cancellation, whole-map nearest infrastructure discovery, compact brief/zones/nearby helpers.
+- Ten-second default helper polling, one-second intervals, progress messages and typed recovery statuses. A transport call has its own bounded timeout.
+- Shared-handle heartbeat reads with bounded retries in coach.
+- FAST-START.md gives small-model decisions and a six-call/45-second progress budget. Helpers cannot enforce another model's chat behaviour.
+
+Unresolved live validation: native zone preview/cancel cleanup and attached water/HV endpoint checks require a loaded test city. Power discovery is a name-based candidate list, not proof of supply; tile ownership and route direction still need inspection. Pollution distance and universal building connector locations are not invented. Later feedback superseded the claim that the mod globally prevented growth: theme-compatible zones grew in the user's test.

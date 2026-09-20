@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 string root = Path.Combine(Path.GetTempPath(), "CitiesIIAgentBridge-tests-" + Guid.NewGuid().ToString("N"));
 int calls = 0, passed = 0;
 var box = new Mailbox(root, (command, args) => {
-    ++calls;
+    ++calls; if (command == "null_result") return null;
     if (command != "ping" && command != "set_camera") throw new InvalidOperationException("unknown_command");
     return new JObject { ["pong"] = true };
 }, () => "city-a");
@@ -32,6 +32,8 @@ foreach (string field in new[] { "session", "citySession", "protocol", "expiresU
     Check(!(bool)Send(r)["ok"] && calls == 1, "reject " + field + " before dispatch");
 }
 Check(!(bool)Send(Request("execute_shell"))["ok"], "unknown command rejected");
+var nullResponse = Send(Request("null_result"));
+Check(!(bool)nullResponse["ok"] && ((string)nullResponse["error"]).Contains("result_missing"), "null dispatch is not reported as successful");
 var broken = Request();
 File.WriteAllText(Path.Combine(box.Requests, (string)broken["id"] + ".json"), "{broken");
 box.Pump();

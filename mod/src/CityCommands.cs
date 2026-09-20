@@ -18,6 +18,7 @@ namespace CitiesIIAgentBridge
         {
             var w = RequireCity(); RequireControl(); CheckBuildTool(w);
             var prefab = BuildPrefab<BuildingPrefab>(w, args);
+            if (w.EntityManager.HasComponent<SpawnableBuildingData>(w.GetExistingSystemManaged<PrefabSystem>().GetEntity(prefab))) throw new ArgumentException("use_zoning_for_growables_get_zone_catalog");
             var point = BuildPoint(w, args["position"] as JObject);
             float rotation = args["rotation"] == null ? 0 : RequiredFloat(args, "rotation");
             point.m_Rotation = quaternion.RotateY(math.radians(rotation));
@@ -159,4 +160,3 @@ namespace CitiesIIAgentBridge
         }
     }
 }
-

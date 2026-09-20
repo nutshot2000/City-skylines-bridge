@@ -106,6 +106,26 @@ namespace CitiesIIAgentBridge
             prefab = road; mode = RequestedMode; elevation = RequestedElevation; parallelCount = 0;
             World.GetExistingSystemManaged<ToolSystem>().activeTool = this;
         }
+        private void ValidateAttachedNode(ControlPoint point)
+        {
+            var wanted = point.m_OriginalEntity;
+            if (Replacement != Entity.Null || !EntityManager.Exists(wanted) || !EntityManager.HasComponent<Game.Net.Node>(wanted)) return;
+            var expected = EntityManager.GetComponentData<Game.Net.Node>(wanted).m_Position;
+            using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Game.Net.Edge>(), ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<PrefabRef>()))
+            using (var edges = q.ToEntityArray(Allocator.Temp)) foreach (var e in edges)
+            {
+                if (EntityManager.GetComponentData<PrefabRef>(e).m_Prefab != expectedPrefab) continue;
+                if ((EntityManager.GetComponentData<Temp>(e).m_Flags & TempFlags.Delete) != 0) continue;
+                var edge = EntityManager.GetComponentData<Game.Net.Edge>(e);
+                foreach (var node in new[] { edge.m_Start, edge.m_End })
+                {
+                    if (!EntityManager.Exists(node) || !EntityManager.HasComponent<Game.Net.Node>(node)) continue;
+                    var original = EntityManager.HasComponent<Temp>(node) ? EntityManager.GetComponentData<Temp>(node).m_Original : node;
+                    if (original == wanted && math.distance(EntityManager.GetComponentData<Game.Net.Node>(node).m_Position, expected) <= 1f) return;
+                }
+            }
+            throw new InvalidOperationException("attached_node_not_preserved_in_native_preview_inspect_node_height_and_network_do_not_retry_same_geometry");
+        }
         protected override void OnStopRunning()
         {
             if (operation != null) { ConstructionAccess.Finish(operation, "interrupted", "active_tool_changed"); operation = null; }
@@ -134,6 +154,7 @@ namespace CitiesIIAgentBridge
                     var errors = ConstructionAccess.Errors(EntityManager);
                     if (errors.Count > 0) { ConstructionAccess.Results[operation]["placementErrors"] = errors; throw new InvalidOperationException("game_rejected_placement"); }
                     if (!GetAllowApply()) { if (frames < 30) return deps; throw new InvalidOperationException("no_valid_road_preview"); }
+                    ValidateAttachedNode(start); ValidateAttachedNode(end);
                     int cost = 0;
                     using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Temp>()))
                     using (var ts = q.ToComponentDataArray<Temp>(Allocator.Temp)) foreach (var t in ts) cost = checked(cost + Math.Max(0, t.m_Cost));
@@ -169,7 +190,7 @@ namespace CitiesIIAgentBridge
 
     public class BridgeZoneTool : ZoneToolSystem
     {
-        internal bool Dezone;
+        internal bool Dezone, PreviewOnly;
         public override string toolID => base.toolID;
         private string operation;
         private int stage, frames;
@@ -222,6 +243,27 @@ namespace CitiesIIAgentBridge
                     if (!GetAllowApply()) throw new InvalidOperationException("game_rejected_zoning");
                     using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<Temp>()))
                         if (q.IsEmptyIgnoreFilter) throw new InvalidOperationException("no_zone_cells_in_rectangle");
+                    var preview = new JArray();
+                    using (var q = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<Cell>(), ComponentType.ReadOnly<Temp>()))
+                    using (var entities = q.ToEntityArray(Allocator.Temp)) foreach (var entity in entities)
+                    {
+                        var original = EntityManager.GetComponentData<Temp>(entity).m_Original;
+                        if (!EntityManager.Exists(original) || !EntityManager.HasBuffer<Cell>(original)) continue;
+                        var block = EntityManager.GetComponentData<Block>(entity);
+                        var cells = EntityManager.GetBuffer<Cell>(entity, true);
+                        var old = EntityManager.GetBuffer<Cell>(original, true);
+                        for (int i = 0; i < Math.Min(cells.Length, old.Length); i++)
+                        {
+                            if (cells[i].m_Zone.Equals(old[i].m_Zone)) continue;
+                            var pos = ZoneUtils.GetCellPosition(block, new int2(i % block.m_Size.x, i / block.m_Size.x));
+                            preview.Add(new JObject { ["blockIndex"] = original.Index, ["blockVersion"] = original.Version,
+                                ["cellIndex"] = i, ["x"] = pos.x, ["y"] = pos.y, ["z"] = pos.z, ["zone"] = cells[i].m_Zone.m_Index });
+                        }
+                    }
+                    ConstructionAccess.Results[operation]["previewCells"] = preview;
+                    ConstructionAccess.Results[operation]["previewOnly"] = PreviewOnly;
+                    if (preview.Count == 0) throw new InvalidOperationException("no_changed_zone_cells_in_native_preview");
+                    if (PreviewOnly) { Finish("complete"); return deps; }
                     applyMode = ApplyMode.Apply; stage = 2; frames = 0; return deps;
                 }
                 applyMode = ApplyMode.Clear; if (++frames < 4) return deps;

@@ -1,6 +1,6 @@
 # Commands without guesswork
 
-Prefer `agent.ps1 -Command COMMAND -ArgsFile arguments.json` when a command can queue work. It submits once, polls the correct operation/batch/simulation ID, and returns a terminal result or a precise pending-ID instruction. `-WaitSeconds` defaults to 30 and is capped at 60 per invocation; resume waiting on the returned ID, never repeat the initiating command.
+Prefer `agent.ps1 -Command COMMAND -ArgsFile arguments.json` when a command can queue work. It submits once, polls the correct operation/batch/simulation ID, and returns a terminal result or a precise pending-ID instruction. `-WaitSeconds` defaults to 10 and is capped at 60 per invocation; resume waiting on the returned ID, never repeat the initiating command.
 
 The transport's `-TimeoutSeconds` (1–45, default 15) is a **request dispatch/response deadline**, not a construction deadline. A batch may take up to 600 seconds. Expired requests stay rejected, including reads; expiry is not an excuse to execute stale commands later.
 
@@ -37,3 +37,15 @@ This searches the entire map's outside road nodes and traverses the road graph f
 ## Native placement errors
 
 Patched construction results include `placementErrors[].nativeReasons` from native error-icon data when available, plus `reasonAvailable`. Empty reasons mean the specific cause is unavailable; do not label the rejection a terrain, shoreline or UI-assets fault without evidence. The watchdog already bounds responsive native construction, but no main-thread callback can recover a completely hung game thread.
+
+## Coach 0.4.4 additions
+
+- get_zone_catalog: zones with current index/version, matchingGrowables, locked and usable. A usable asset is not a growth guarantee.
+- zone_rectangle: start must include current zone block index/version. previewOnly:true returns native previewCells without applying. Generic zones without matching growables are rejected.
+- get_tool_status: activeTool, operationId, simulationRunning, batchRunning, readyForConstruction. Does not interrupt simulation.
+- cancel_tool: requires controls; cancels the native tool, not already applied city changes. Running simulation/batch must use their own cancellation commands.
+- get_nearby_infrastructure: x,z required; up to 12 nearest road and 12 power-name candidates across the map, ranked by endpoint distance. Does not prove tile ownership, external supply, or connectivity.
+- get_network: liveDegree and orphan supplement node edges.
+- get_simulation_step: retains earlier step IDs for the current city session.
+
+Use FAST-START.md for the bounded workflow and recovery table.

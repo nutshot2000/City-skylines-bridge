@@ -86,7 +86,7 @@ namespace CitiesIIAgentBridge
                     if (command != "ping" && command != "get_city_state" && command != "get_capabilities" &&
                         (string)request["citySession"] != citySession())
                         throw new InvalidOperationException("stale_city_session");
-                    response["result"] = dispatch(command, request["args"] as JObject ?? new JObject());
+                    response["result"] = dispatch(command, request["args"] as JObject ?? new JObject()) ?? throw new InvalidOperationException("result_missing_outcome_unknown_do_not_repeat");
                     response["ok"] = true;
                 }
                 catch (Exception e)

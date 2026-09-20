@@ -6,10 +6,10 @@ This repository includes the helper kit and an optional patched mod source build
 
 ## Start
 
-Use [agent.ps1](agent.ps1) to submit once and automatically wait for completion. See [COMMANDS.md](COMMANDS.md) for exact result keys and the whole-map outside-road check. Read [START-HERE.md](START-HERE.md). Agents should first read [AGENTS.md](AGENTS.md), then run:
+Use [agent.ps1](agent.ps1) to submit once and automatically wait for completion. See [COMMANDS.md](COMMANDS.md) for exact result keys and the whole-map outside-road check. Read [FAST-START.md](FAST-START.md) for bounded steps and recovery. Agents should first read [AGENTS.md](AGENTS.md), then run:
 
 ```powershell
-pwsh -NoProfile -File ./coach.ps1 doctor
+pwsh -NoProfile -File ./coach.ps1 brief
 ```
 
 ## Included
