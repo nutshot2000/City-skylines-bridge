@@ -174,7 +174,7 @@ namespace CitiesIIAgentBridge
         private string operation;
         private int stage, frames;
         private ControlPoint start, end;
-        
+
         private DateTime deadline;
         private Dictionary<string, ushort> before;
         public void Begin(ZonePrefab zone, ControlPoint a, ControlPoint b)
