@@ -135,6 +135,7 @@ namespace CitiesIIAgentBridge
             var w = RequireCity(); var em = w.EntityManager; var rows = new JArray(); string filter = (string)args["filter"] ?? "";
             foreach (var e in NativeBuild.Buildings(em))
             {
+                if ((bool?)args["includeNative"] != true && em.HasComponent<Game.Common.Native>(e)) continue;
                 var info = Inspect(w, e); if (((string)info["prefab"] ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 info["serviceDataRaw"] = Details(w,e);
                 var b = em.GetComponentData<Game.Buildings.Building>(e); info["roadEdge"] = NativeBuild.Id(b.m_RoadEdge); info["buildingFlags"] = b.m_Flags.ToString();
@@ -153,10 +154,10 @@ namespace CitiesIIAgentBridge
                 }
                 if (em.HasComponent<Game.Buildings.WaterConsumer>(e)) { var c = em.GetComponentData<Game.Buildings.WaterConsumer>(e); if (c.m_FulfilledFresh < c.m_WantedConsumption) issues.Add("fresh_water_shortfall"); if (c.m_FulfilledSewage < c.m_WantedConsumption) issues.Add("sewage_shortfall"); }
                 if (em.HasComponent<Game.Buildings.ElectricityConsumer>(e)) { var c = em.GetComponentData<Game.Buildings.ElectricityConsumer>(e); if (c.m_FulfilledConsumption < c.m_WantedConsumption) issues.Add("electricity_shortfall"); }
-                info["issues"] = issues; if ((bool?)args["problemsOnly"] == true && issues.Count == 0) continue;
+                info["diagnosisStatus"] = issues.Count > 0 ? "recognised_issues" : "no_recognised_issue_not_certified"; info["issues"] = issues; if ((bool?)args["problemsOnly"] == true && issues.Count == 0) continue;
                 rows.Add(info); if (rows.Count >= 512) break;
             }
-            return new JObject { ["buildings"] = rows, ["limit"] = 512 };
+            return new JObject { ["buildings"] = rows, ["limit"] = 512, ["possiblyTruncated"] = rows.Count >= 512, ["problemsOnly"] = (bool?)args["problemsOnly"] == true, ["nativeExcluded"] = (bool?)args["includeNative"] != true, ["meaning"] = "Only recognised component checks. Empty issues or zero filtered rows are not a health certificate. UI notification reasons are not collected. Use get_buildings for all city buildings." };
         }
     }
 }

@@ -1,7 +1,7 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param(
- [ValidateSet('brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
+ [ValidateSet('status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
  [string]$Filter='', [int]$Index=0, [int]$Version=0,
  [double]$X=0, [double]$Z=0, [int]$Radius=120,
  [int]$FromIndex=0,[int]$FromVersion=0,[int]$ToIndex=0,[int]$ToVersion=0,
@@ -9,7 +9,7 @@ param(
  [string]$PlanPath='', [string]$OperationId='', [ValidateSet('operation','batch','simulation')][string]$Kind='operation',
  [string]$MailboxPath=(Join-Path $env:LOCALAPPDATA 'CitiesIIAgentBridge'),
  [string]$RecordPath=(Join-Path $PSScriptRoot 'records'),
- [switch]$LibraryOnly
+ [switch]$Reassessed, [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
 
@@ -67,7 +67,7 @@ function CompactBuilding($b) {
  if($null -ne $b.waterProducer){$roles+='fresh_water_source'}
  if($null -ne $b.sewageOutlet){$roles+='sewage_processor'}
  if($null -ne $b.waterConsumer){$roles+='water_consumer'}
- [ordered]@{id="$($b.index):$($b.version)";name=$b.prefab;roles=$roles;position=$b.position;road=$b.roadEdge;electricity=$b.electricityConnections;water=$b.waterConnections;waterDemand=$b.waterConsumer;waterProduction=$b.waterProducer;sewageProcessing=$b.sewageOutlet;issues=@($b.issues)}
+ [ordered]@{id="$($b.index):$($b.version)";name=$b.prefab;roles=$roles;position=$b.position;road=$b.roadEdge;electricity=$b.electricityConnections;electricityDemand=$b.electricityConsumer;underConstruction=$b.underConstruction;diagnosisStatus=$b.diagnosisStatus;water=$b.waterConnections;waterDemand=$b.waterConsumer;waterProduction=$b.waterProducer;sewageProcessing=$b.sewageOutlet;issues=@($b.issues)}
 }
 function Diagnose($City,$Buildings,$Diagnostics) {
  $rows=@($Buildings.buildings|Where-Object { @($_.components) -notcontains 'Game.Common.Native' })
@@ -159,6 +159,7 @@ function ApplyPlan {
 if($LibraryOnly){return}
 try {
  $result=switch($Action) {
+  'status' {Call get_status}
   'zones' {Call get_zone_catalog}
   'nearby' {if(!$PSBoundParameters.ContainsKey('X') -or !$PSBoundParameters.ContainsKey('Z')){throw 'Supply -X and -Z from current city observations.'};Call get_nearby_infrastructure @{x=$X;z=$Z}}
   'brief' {
@@ -225,7 +226,7 @@ try {
   'wait' {if(!$OperationId){throw 'Supply the original -OperationId.'};$poll=@{operation='get_operation';batch='get_batch';simulation='get_simulation_step'}[$Kind];Await $OperationId $poll}
   'settle' {
    $null=Control
-   $op=Call simulate_step @{frames=512;wallSeconds=5;stallSeconds=3;speed=1;cashFloor=$Reserve;stopOnNewShortage=$true}
+   $op=Call simulate_step @{frames=512;wallSeconds=5;stallSeconds=3;speed=1;cashFloor=$Reserve;stopOnNewShortage=$true;acknowledgeNoProgress=[bool]$Reassessed}
    $done=Await $op.id 'get_simulation_step' 12
    if($done.status -eq 'pending_do_not_resubmit'){ $cancel=Call cancel_simulation_step; return @{status='review_needed';cancellation=$cancel;operationId=$op.id;next='Inspect pause state; do not run another interval automatically.'} }
    @{status=$done.status;reason=$done.reason;paused=$done.paused;advancedFrames=$done.advancedFrames;delta=$done.delta;next='Run doctor. This short interval may be insufficient; unchanged readings are inconclusive, not proof of success.'}

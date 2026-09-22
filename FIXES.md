@@ -40,3 +40,9 @@ Upstream's documented game target and the locally reported game version are diff
 - FAST-START.md gives small-model decisions and a six-call/45-second progress budget. Helpers cannot enforce another model's chat behaviour.
 
 Unresolved live validation: native zone preview/cancel cleanup and attached water/HV endpoint checks require a loaded test city. Power discovery is a name-based candidate list, not proof of supply; tile ownership and route direction still need inspection. Pollution distance and universal building connector locations are not invented. Later feedback superseded the claim that the mod globally prevented growth: theme-compatible zones grew in the user's test.
+
+## 0.4.5-coach.1
+
+Consumer electricity snapshots in inspect/buildings and doctor; edge coordinate aliases and inspection geometry; non-pausing get_status/coach status; explicit diagnosis coverage and native decoration exclusion; under-construction presence; explicit settle -Reassessed; clarified preview argument examples.
+
+Not addressed by this release: live UI notification extraction, construction progress/blocker reasons, unlock milestone requirements, true consumer-to-network mapping and electricity flow attribution. Existing native pipe snapping limitation remains. No claim that unknown fields or no recognised issue certify service delivery.

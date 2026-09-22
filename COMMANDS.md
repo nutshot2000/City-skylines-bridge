@@ -49,3 +49,23 @@ Patched construction results include `placementErrors[].nativeReasons` from nati
 - get_simulation_step: retains earlier step IDs for the current city session.
 
 Use FAST-START.md for the bounded workflow and recovery table.
+
+## 0.4.5 diagnostic improvements
+
+Use `pwsh -NoProfile -File ./coach.ps1 status` for one non-pausing city/tool snapshot (`get_status`). It does not collect detailed shortages; use doctor for that, which still pauses analysis. No automatic resume occurs.
+
+Consumer electricity appears as `electricityConsumer` in inspect/get_buildings, and `electricityDemand` in doctor: wantedConsumption, fulfilledConsumption, cooldown and snapshot status. Null is unavailable data, not proof of disconnection. Water remains waterConsumer/waterDemand. underConstruction indicates presence, not progress percentage.
+
+Network edges now expose `start` and `end` coordinates as well as the original four-point `curve`. inspect_entity exposes edge geometry and endpoint node IDs. The nearest node is still not proof of a building's actual utility connection.
+
+get_buildings/diagnose_connections exclude native map decorations by default; use includeNative:true if required. diagnose remains problems-only. `no_recognised_issue_not_certified` and response meaning explain its limited checks. UI notification reasons are not yet captured.
+
+After reassessing a stagnant simulation, `coach.ps1 settle -Reassessed` explicitly acknowledges that review and runs one bounded interval. Do not use it in an automatic retry loop.
+
+preview_building takes the same arguments as place_building, with a `position` object (not `point`) and maxCost. Replace the placeholder IDs/coordinates with discovered values:
+
+```json
+{"prefabIndex":123,"prefabVersion":1,"position":{"x":100,"z":200},"rotation":0,"maxCost":10000}
+```
+
+Zoning catalog uses index/version as prefab identity; it has no zoneId field. Cell zone values are a different namespace. Use matchingGrowables and usable when choosing the prefab.

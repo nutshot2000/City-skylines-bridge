@@ -31,7 +31,7 @@ namespace CitiesIIAgentBridge
         private bool disposed;
         private bool faulted;
         private bool mailboxContended;
-        private const string ModVersion = "0.4.4-coach.2";
+        private const string ModVersion = "0.4.5-coach.1";
 
         public void OnLoad(UpdateSystem updateSystem)
         {
@@ -145,7 +145,7 @@ namespace CitiesIIAgentBridge
         private JObject Dispatch(string command, JObject args)
         {
             // These status polls must not terminate an active bounded simulation step.
-            bool statusOnly = command == "get_tool_status" || command == "ping" || command == "get_capabilities" || command == "get_operation" || command == "get_batch" || command == "get_simulation_step";
+            bool statusOnly = command == "get_status" || command == "get_tool_status" || command == "ping" || command == "get_capabilities" || command == "get_operation" || command == "get_batch" || command == "get_simulation_step";
             if(!statusOnly && command != "simulate_step" && command != "cancel_simulation_step" && command != "set_simulation_speed" && command != "set_camera")
             {
                 if(settings.AllowControl) PauseAnalysis();
@@ -163,15 +163,16 @@ namespace CitiesIIAgentBridge
                 case "ping": return new JObject { ["pong"] = true, ["modVersion"] = ModVersion };
                 case "get_capabilities": return new JObject
                 {
-                    ["read"] = new JArray("ping", "get_capabilities", "get_city_state", "get_camera", "get_selected", "inspect_entity", "get_water_facilities", "get_outside_connections"),
+                    ["read"] = new JArray("get_status", "ping", "get_capabilities", "get_city_state", "get_camera", "get_selected", "inspect_entity", "get_water_facilities", "get_outside_connections"),
                     ["control"] = new JArray("cancel_tool", "set_camera", "set_simulation_speed", "build_road", "build_network", "upgrade_network", "zone_rectangle", "clear_zoning", "place_building", "relocate_building", "demolish", "purchase_tiles", "set_tax", "set_service_budget", "save_checkpoint", "batch_execute"),
                     ["constructionQueries"] = new JArray("get_nearby_infrastructure", "get_zone_catalog", "get_tool_status", "get_build_prefabs", "get_prefab_details", "get_network", "get_network_edges", "trace_network", "get_zone_cells", "get_operation", "get_batch", "get_city_management", "get_services", "sample_terrain", "get_tiles", "get_buildings", "diagnose_connections"),
-                    ["buildVersion"] = ModVersion, ["liveValidation"] = "v0.4.4-coach.2_compiled_runtime_validation_pending",
+                    ["buildVersion"] = ModVersion, ["liveValidation"] = "v0.4.5-coach.1_compiled_runtime_validation_pending",
                     ["planning"] = new JArray("get_city_map","get_city_diagnostics","find_building_sites","preview_building","plan_neighborhood","execute_neighborhood","get_neighborhood_plan"),
                     ["simulation"] = new JArray("pause_for_analysis","simulate_step","get_simulation_step","cancel_simulation_step","cancel_batch"),
                     ["analysisPausesGame"] = true,
                     ["construction"] = "native_preview_and_apply", ["controlEnabled"] = settings.AllowControl
                 };
+                case "get_status": return new JObject { ["city"] = CityState(), ["tool"] = ToolStatus(), ["pausesGame"] = false, ["meaning"] = "Live point-in-time status. Does not certify utility delivery or alter simulation speed." };
                 case "get_city_state": return CityState();
                 case "get_city_diagnostics": return Diagnostics(args);
                 case "get_city_map": return CityMap(args);
@@ -351,6 +352,28 @@ namespace CitiesIIAgentBridge
                 result["rotationQuaternion"] = new JArray(transform.m_Rotation.value.x, transform.m_Rotation.value.y, transform.m_Rotation.value.z, transform.m_Rotation.value.w);
             }
             if (em.HasComponent<Game.Net.Node>(entity)) result["position"] = Vector(em.GetComponentData<Game.Net.Node>(entity).m_Position);
+            if (em.HasComponent<Game.Net.Curve>(entity))
+            {
+                var c = em.GetComponentData<Game.Net.Curve>(entity);
+                result["start"] = Vector(c.m_Bezier.a); result["end"] = Vector(c.m_Bezier.d);
+                result["curve"] = new JArray(Vector(c.m_Bezier.a), Vector(c.m_Bezier.b), Vector(c.m_Bezier.c), Vector(c.m_Bezier.d));
+                result["length"] = c.m_Length;
+            }
+            if (em.HasComponent<Game.Net.Edge>(entity))
+            {
+                var e = em.GetComponentData<Game.Net.Edge>(entity);
+                result["startNode"] = NativeBuild.Id(e.m_Start); result["endNode"] = NativeBuild.Id(e.m_End);
+            }
+            result["underConstruction"] = em.HasComponent<Game.Objects.UnderConstruction>(entity);
+            if ((bool)result["underConstruction"]) result["constructionMeaning"] = "Construction component present; progress and blocker reason are not available in this report.";
+            result["electricityConsumer"] = null;
+            if (em.HasComponent<Game.Buildings.ElectricityConsumer>(entity))
+            {
+                var c = em.GetComponentData<Game.Buildings.ElectricityConsumer>(entity);
+                result["electricityConsumer"] = new JObject { ["wantedConsumption"] = c.m_WantedConsumption, ["fulfilledConsumption"] = c.m_FulfilledConsumption, ["cooldown"] = c.m_CooldownCounter,
+                    ["status"] = c.m_WantedConsumption <= 0 ? "no_demand_unproven" : c.m_FulfilledConsumption < c.m_WantedConsumption ? "shortfall" : "demand_fulfilled_at_snapshot" };
+            }
+            result["utilityEvidenceMeaning"] = "Null means component data unavailable, not disconnected. Fulfillment is a simulation snapshot, not a live UI-warning audit or a proof of source-to-consumer routing.";
             using (var types = em.GetComponentTypes(entity, Allocator.Temp))
                 result["components"] = new JArray(types.Select(t => t.GetManagedType().FullName));
             if (em.HasComponent<Game.Buildings.WaterConsumer>(entity))

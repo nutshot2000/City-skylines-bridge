@@ -43,3 +43,9 @@ Water needs a working pump/tower, sewage needs a working outlet/treatment facili
 The panel with house icons and regional/theme buttons is the zoning palette. In the live reproduction, four cells were successfully assigned NA Residential Low, the operation finished, and the native tool returned to default while this panel remained visible. Simulation advanced 312 frames with it still open. It was not blocking confirmation.
 
 After zoning, inspect changedCells and the actual cell zones. For non-preview completion, run one authorized settle interval instead of waiting for growth while paused. The palette can be closed with its X; selecting another house icon changes the tool choice, not confirmation of the completed zoning. Do not click randomly. This observation does not prove what happened in every older agent session, especially one that selected a generic zone with zero growables.
+
+## Read status without pausing
+
+Use `coach.ps1 status` while observing a running city. It returns city/tool status without changing speed. Doctor and detailed analysis still pause. A missing electricity connection object does not mean a consumer has no power: read electricityDemand wanted/fulfilled values. A missing consumer value means unknown, not zero.
+
+If settle stops after three stagnant steps, reassess the evidence and change the plan if needed. `settle -Reassessed` acknowledges that review for one bounded interval; never automatically loop it. UI warning disagreement remains unresolved until the same building and simulation timing are compared.

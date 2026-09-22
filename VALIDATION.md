@@ -46,3 +46,7 @@ This verifies rejection of the reproduced double-burial case, not successful nat
 ## Housing palette live reproduction
 
 User identified the residential icon/theme palette left open after a four-cell zone_rectangle operation. All four cells were read back as the selected residential zone and the tool returned to default. A bounded simulation step advanced 312 frames with the palette still open. Therefore the reproduced panel did not require a confirmation click or block simulation. Closed its X afterward. The helper now adds explicit zoning nextAction guidance distinguishing preview from applied zoning and prompting one bounded simulation step when authorized. No claim of new house growth is made from this test.
+
+## 0.4.5-coach.1 validation
+
+Compiled against the local game assembly. 137 offline checks passed: 24 helper checks (including consumer electricity and construction/diagnosis preservation), 22 client checks and 91 mailbox/policy/recovery checks. New native inspection fields and non-pausing status are compiled but not live-validated. Game was running during packaging; no DLL replacement or gameplay action performed.

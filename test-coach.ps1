@@ -17,6 +17,9 @@ Check ($r.status -eq 'inspection_only_supply_not_certified') 'zero demand and ze
 Check (($r.next -join ' ') -match 'No local freshwater') 'missing freshwater gets a concrete next step'
 $r=Diagnose $city $buildings $null
 Check ($r.partial -and ($r.next -join ' ') -notmatch 'No local freshwater') 'missing diagnostics stays unknown'
+$card=CompactBuilding @{index=7;version=1;prefab='Home';components=@('Game.Buildings.ElectricityConsumer');electricityConsumer=@{wantedConsumption=4;fulfilledConsumption=1;status='shortfall'};underConstruction=$true;diagnosisStatus='recognised_issues';issues=@('electricity_shortfall')}
+Check ($card.electricityDemand.wantedConsumption -eq 4 -and $card.electricityDemand.fulfilledConsumption -eq 1) 'doctor preserves consumer electricity evidence'
+Check ($card.underConstruction -and $card.diagnosisStatus -eq 'recognised_issues') 'doctor preserves construction and diagnosis state'
 $s=@{session='s';citySession='c'}
 $p=@{schema=1;id=[guid]::NewGuid().ToString('N');session='s';citySession='c';expiresUtc=[DateTimeOffset]::UtcNow.AddMinutes(5).ToString('O');command='place_building';prefabName='FixtureSource';reserve=500;args=@{maxCost=100;prefabIndex=10;prefabVersion=1;position=@{x=1;z=2};allowDemolition=$false}}
 ValidatePlan $p $s $city

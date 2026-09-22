@@ -26,6 +26,7 @@ namespace CitiesIIAgentBridge
                 var edge = em.GetComponentData<Game.Net.Edge>(e); var info = NativeBuild.Id(e);
                 info["prefab"] = ps.GetPrefabName(em.GetComponentData<PrefabRef>(e).m_Prefab);
                 info["prefabName"] = info["prefab"].DeepClone(); info["startNode"] = NativeBuild.Id(edge.m_Start); info["endNode"] = NativeBuild.Id(edge.m_End); info["length"] = curve.m_Length;
+                info["start"] = Vector(curve.m_Bezier.a); info["end"] = Vector(curve.m_Bezier.d);
                 info["curve"] = new JArray(Vector(curve.m_Bezier.a), Vector(curve.m_Bezier.b), Vector(curve.m_Bezier.c), Vector(curve.m_Bezier.d));
                 if (em.HasComponent<Game.Net.Road>(e))
                 {
