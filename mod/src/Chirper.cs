@@ -19,9 +19,7 @@ namespace CitiesIIAgentBridge
             var w=RequireCity(); var em=w.EntityManager;
             var ui=w.GetExistingSystemManaged<ChirperUISystem>();
             if(ui==null) throw new InvalidOperationException("chirper_ui_system_unavailable");
-            var messageMethod=typeof(ChirperUISystem).GetMethod("GetMessageID",BindingFlags.Instance|BindingFlags.NonPublic,null,new[]{typeof(Entity)},null);
             var ticksMethod=typeof(ChirperUISystem).GetMethod("GetTicks",BindingFlags.Instance|BindingFlags.NonPublic,null,new[]{typeof(uint)},null);
-            if(messageMethod==null) throw new InvalidOperationException("chirper_native_message_api_changed");
             var locale=GameManager.instance.localizationManager;
             var rows=new JArray(); int total;
             using(var q=em.CreateEntityQuery(new EntityQueryDesc {All=new[]{ComponentType.ReadOnly<Game.Triggers.Chirp>()},None=new[]{ComponentType.ReadOnly<Game.Common.Deleted>()}}))
@@ -36,7 +34,7 @@ namespace CitiesIIAgentBridge
                     row["messageId"]=null; row["text"]=null; row["dateTicks"]=null;
                     try
                     {
-                        string key=(string)messageMethod.Invoke(ui,new object[]{e}); row["messageId"]=key;
+                        string key=ui.GetMessageID(e); row["messageId"]=key;
                         if(!string.IsNullOrEmpty(key) && locale.activeDictionary.TryGetValue(key,out var text)) row["text"]=text;
                         else errors.Add("localized_message_unavailable");
                     }catch(Exception ex){errors.Add("message: "+ex.GetBaseException().Message);}

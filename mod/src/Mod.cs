@@ -31,7 +31,7 @@ namespace CitiesIIAgentBridge
         private bool disposed;
         private bool faulted;
         private bool mailboxContended;
-        private const string ModVersion = "0.4.7-coach.1";
+        private const string ModVersion = "0.4.7-coach.2";
 
         public void OnLoad(UpdateSystem updateSystem)
         {
@@ -166,7 +166,7 @@ namespace CitiesIIAgentBridge
                     ["read"] = new JArray("get_chirper", "get_devtree", "get_status", "ping", "get_capabilities", "get_city_state", "get_camera", "get_selected", "inspect_entity", "get_water_facilities", "get_outside_connections"),
                     ["control"] = new JArray("purchase_node", "cancel_tool", "set_camera", "set_simulation_speed", "build_road", "build_network", "upgrade_network", "zone_rectangle", "clear_zoning", "place_building", "relocate_building", "demolish", "purchase_tiles", "set_tax", "set_service_budget", "save_checkpoint", "batch_execute"),
                     ["constructionQueries"] = new JArray("get_nearby_infrastructure", "get_zone_catalog", "get_tool_status", "get_build_prefabs", "get_prefab_details", "get_network", "get_network_edges", "trace_network", "get_zone_cells", "get_operation", "get_batch", "get_city_management", "get_services", "sample_terrain", "get_tiles", "get_buildings", "diagnose_connections"),
-                    ["buildVersion"] = ModVersion, ["liveValidation"] = "v0.4.7-coach.1_compiled_runtime_validation_pending",
+                    ["buildVersion"] = ModVersion, ["liveValidation"] = "v0.4.7-coach.2_compiled_runtime_validation_pending",
                     ["planning"] = new JArray("get_city_map","get_city_diagnostics","find_building_sites","preview_building","plan_neighborhood","execute_neighborhood","get_neighborhood_plan"),
                     ["simulation"] = new JArray("pause_for_analysis","simulate_step","get_simulation_step","cancel_simulation_step","cancel_batch"),
                     ["analysisPausesGame"] = true,

@@ -64,3 +64,7 @@ Game is running, so the new DLL is staged and not installed. Native development 
 ## 0.4.7-coach.1 validation
 
 Compiled against the installed game assembly. 66 helper checks passed (23 client, 26 coach, 10 building report, 7 response guide), including a fake-mailbox Chirper round trip preserving limit, text and non-pausing metadata. No game commands sent. The new native feed implementation is compiled but not yet live-tested against the sidebar. The game is running, so the DLL remains staged, not installed.
+
+## 0.4.7-coach.2 Chirper hotfix
+
+Confirmed in the installed game assembly: ChirperUISystem.GetMessageID(Entity) is public; GetTicks(uint) is private. Replaced the incorrect non-public reflection lookup with a direct public GetMessageID call. Compilation now checks the method signature/visibility instead of discovering this mismatch at runtime. GetTicks retains its private reflection lookup. Build passed; live Chirper output still needs retesting.
