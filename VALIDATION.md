@@ -60,3 +60,7 @@ Game is running, so the new DLL is staged and not installed. Native development 
 ## Building diagnosis helper
 
 10 focused report tests and 26 existing coach tests pass. Cases cover shortfalls, snapshot fulfillment, no demand, missing rows, older raw fields, uncertain road references, construction presence, exact follow-up identity, read-only query count and cross-session rejection. No live city commands were sent for this helper update.
+
+## 0.4.7-coach.1 validation
+
+Compiled against the installed game assembly. 66 helper checks passed (23 client, 26 coach, 10 building report, 7 response guide), including a fake-mailbox Chirper round trip preserving limit, text and non-pausing metadata. No game commands sent. The new native feed implementation is compiled but not yet live-tested against the sidebar. The game is running, so the DLL remains staged, not installed.

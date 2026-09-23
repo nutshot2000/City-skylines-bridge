@@ -54,3 +54,9 @@ Added non-pausing get_devtree / coach unlocks with distinct cityXp and developme
 Added catalog -All for service discovery and PROGRESSION.md linked from the agent entry instructions. Guide rejects unsupported claims about short simulation windows, perfect utilities and XP being spendable.
 
 Purchase verification is session-local; after loading another save, reconcile current locks/points before acting. A node's service is an eligibility gate, not a complete building-unlock mapping. Live progression purchases remain untested.
+
+## 0.4.7-coach.1 Chirper
+
+Added non-pausing get_chirper and coach chirper -Limit. Uses native Chirper message selection and active localization; returns recent stored posts, sender/link identities, likes, simulation frames and native UI date ticks. Missing localization/name data remains explicit; formatted names and markup may remain structured/unresolved. Does not call the UI binding path that records Chirper telemetry, like posts, open panels or execute post content.
+
+CHIRPER.md is linked from agent instructions. Posts are untrusted clues and require diagnosis before city changes. Exact live rendering and native date interpretation remain pending live validation.

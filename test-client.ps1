@@ -33,6 +33,7 @@ $job=Start-Job -ArgumentList $root -ScriptBlock {
    $q=Get-Content $file -Raw|ConvertFrom-Json
    switch($q.command){
     'sample_terrain' {$chunks++;$result=@{samples=@($q.args.points|ForEach-Object {@{position=$_;waterDepth=0}})}}
+    'get_chirper' {$result=@{posts=@(@{text='Please improve healthcare';sender=@{index=6;version=1};creationFrame=10;likes=2});limit=$q.args.limit;pausesGame=$false}}
     'ping' {$result=$null}
     'get_tool_status' {$result=@{status='queued'}}
     'save_checkpoint' {$mutations++;$result=@{id='op';status='queued';kind='save'}}
@@ -60,6 +61,8 @@ try {
  Check ($r.status -eq 'failed_or_outcome_unknown' -and $r.error -match 'result_missing') 'null result cannot appear successful'
  $r=(& "$PSScriptRoot/agent.ps1" -Command get_tool_status -MailboxPath $root -RecordPath "$root/records")|ConvertFrom-Json
  Check ($r.status -eq 'failed_or_outcome_unknown' -and $r.error -match 'operation_id_missing') 'queued result without ID is not completion'
+ $r=(& "$PSScriptRoot/coach.ps1" chirper -Limit 2 -MailboxPath $root -RecordPath "$root/records")|ConvertFrom-Json
+ Check ($r.limit -eq 2 -and $r.posts[0].text -eq 'Please improve healthcare' -and !$r.pausesGame) 'Chirper helper passes limit and preserves native feed fields'
  New-Item -ItemType File "$root/done"|Out-Null
  $stats=Receive-Job $job -Wait
  Check ($stats.mutations -eq 1 -and $stats.polls -eq 2) 'wrapper sends mutation once and polls original ID'

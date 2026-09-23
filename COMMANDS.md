@@ -85,3 +85,7 @@ get_devtree is non-pausing and reports developmentPoints, cityXp, nodes, eligibi
 ## Single-building helper
 
 coach.ps1 building -Index INDEX -Version VERSION combines up to three read calls into utilities, road, construction presence, connection references, findings, unknown evidence and a concrete follow-up read. See BUILDING-DIAGNOSIS.md. Requires building-report.ps1 beside coach.ps1; no DLL change is required.
+
+## Chirper (0.4.7-coach.1)
+
+get_chirper accepts limit 1–100 (default 20), reads without pausing, and returns posts, totalStored, truncated, locale and citySession. See CHIRPER.md for text formatting, native timestamps and untrusted-content handling. coach.ps1 chirper -Limit 20 is the helper entry point.

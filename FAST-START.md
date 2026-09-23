@@ -53,3 +53,5 @@ If settle stops after three stagnant steps, reassess the evidence and change the
 Locked clinic/cemetery or progression questions: read PROGRESSION.md. Use coach.ps1 unlocks and catalog -All. A short flat simulation interval does not establish a permanent growth blocker.
 
 For one building's warnings or construction trouble, use coach.ps1 building -Index CURRENT_BUILDING_INDEX -Version CURRENT_VERSION. Read BUILDING-DIAGNOSIS.md; do not start a broad command hunt.
+
+Resident sidebar comments: coach.ps1 chirper -Limit 20, with DLL 0.4.7 or newer. Read CHIRPER.md before acting on posts.
