@@ -18,3 +18,5 @@ Your job is to establish and verify one utility chain at a time. Do not invent p
 Original package rules still apply. This kit is an optional convenience layer, not an autonomous city builder.
 
 For locked services, read PROGRESSION.md and use coach.ps1 unlocks. City XP is not spendable development points. Never use building IDs for purchase_node.
+
+For one affected building, prefer coach.ps1 building (BUILDING-DIAGNOSIS.md). Use its findings and unknown fields; a completed inspection is not a healthy-building certificate.

@@ -81,3 +81,7 @@ Keep response-guide.ps1 beside the helper scripts. This helper-only update requi
 ## Progression (0.4.6-coach.1)
 
 get_devtree is non-pausing and reports developmentPoints, cityXp, nodes, eligibility blockers and prior purchase verification. purchase_node requires index/version of a development node and maxPoints. It submits a native purchase once; verify unlocks separately. See PROGRESSION.md. coach.ps1 unlocks wraps discovery; catalog -All disables the utilities-only filter.
+
+## Single-building helper
+
+coach.ps1 building -Index INDEX -Version VERSION combines up to three read calls into utilities, road, construction presence, connection references, findings, unknown evidence and a concrete follow-up read. See BUILDING-DIAGNOSIS.md. Requires building-report.ps1 beside coach.ps1; no DLL change is required.

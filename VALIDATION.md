@@ -56,3 +56,7 @@ Compiled against the local game assembly. 137 offline checks passed: 24 helper c
 Build succeeded against the installed Game.dll. 154 offline checks passed: 99 native-independent mailbox/policy/recovery checks (including 8 development eligibility cases), 26 coach checks, 22 client checks and 7 response-guidance checks. New cases cover prerequisite/service gating, insufficient points, pending/already-unlocked nodes, invalid cost, all-service catalog and accepted-versus-verified purchase guidance.
 
 Game is running, so the new DLL is staged and not installed. Native development queries/purchases still require live validation after installation. No city points spent during this work.
+
+## Building diagnosis helper
+
+10 focused report tests and 26 existing coach tests pass. Cases cover shortfalls, snapshot fulfillment, no demand, missing rows, older raw fields, uncertain road references, construction presence, exact follow-up identity, read-only query count and cross-session rejection. No live city commands were sent for this helper update.

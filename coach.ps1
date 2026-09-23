@@ -1,7 +1,7 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param(
- [ValidateSet('unlocks','status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
+ [ValidateSet('building','unlocks','status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
  [string]$Filter='', [int]$Index=0, [int]$Version=0,
  [double]$X=0, [double]$Z=0, [int]$Radius=120,
  [int]$FromIndex=0,[int]$FromVersion=0,[int]$ToIndex=0,[int]$ToVersion=0,
@@ -13,6 +13,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'response-guide.ps1')
+. (Join-Path $PSScriptRoot 'building-report.ps1')
 
 
 function Read-MailboxText([string]$Path) {
@@ -161,6 +162,7 @@ function ApplyPlan {
 if($LibraryOnly){return}
 try {
  $result=switch($Action) {
+  'building' {DiagnoseOneBuilding $Index $Version}
   'unlocks' {Call get_devtree}
   'status' {Call get_status}
   'zones' {Call get_zone_catalog}
