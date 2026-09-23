@@ -77,3 +77,7 @@ agent.ps1 and coach.ps1 add a guidance object while preserving existing result/s
 guidance.nextAction explains what to inspect or supply. When a concrete next read is known, nextCommand includes script, command and args; pending operations retain their original ID. Suggestions are not executed automatically. retryOriginal is always false: fix preconditions and inspect evidence before choosing a new action. Errors after application or missing results remain uncertain.
 
 Keep response-guide.ps1 beside the helper scripts. This helper-only update requires no game restart; the separate 0.4.5 DLL upgrade still requires installation while the game is closed.
+
+## Progression (0.4.6-coach.1)
+
+get_devtree is non-pausing and reports developmentPoints, cityXp, nodes, eligibility blockers and prior purchase verification. purchase_node requires index/version of a development node and maxPoints. It submits a native purchase once; verify unlocks separately. See PROGRESSION.md. coach.ps1 unlocks wraps discovery; catalog -All disables the utilities-only filter.

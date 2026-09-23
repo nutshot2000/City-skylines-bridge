@@ -49,3 +49,5 @@ After zoning, inspect changedCells and the actual cell zones. For non-preview co
 Use `coach.ps1 status` while observing a running city. It returns city/tool status without changing speed. Doctor and detailed analysis still pause. A missing electricity connection object does not mean a consumer has no power: read electricityDemand wanted/fulfilled values. A missing consumer value means unknown, not zero.
 
 If settle stops after three stagnant steps, reassess the evidence and change the plan if needed. `settle -Reassessed` acknowledges that review for one bounded interval; never automatically loop it. UI warning disagreement remains unresolved until the same building and simulation timing are compared.
+
+Locked clinic/cemetery or progression questions: read PROGRESSION.md. Use coach.ps1 unlocks and catalog -All. A short flat simulation interval does not establish a permanent growth blocker.

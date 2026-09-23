@@ -55,3 +55,4 @@ Console.WriteLine($"{PolicyTests.Run()} simulation and geometry checks passed.")
 Console.WriteLine($"{ObjectPlacementTests.Run()} object placement safety checks passed.");
 Console.WriteLine($"{RecoveryTests.Run()} mailbox recovery checks passed.");
 Console.WriteLine($"{MailboxClientTests.Run()} real PowerShell mailbox client checks passed.");
+Console.WriteLine($"{DevelopmentTests.Run()} development eligibility checks passed.");

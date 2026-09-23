@@ -50,3 +50,9 @@ User identified the residential icon/theme palette left open after a four-cell z
 ## 0.4.5-coach.1 validation
 
 Compiled against the local game assembly. 137 offline checks passed: 24 helper checks (including consumer electricity and construction/diagnosis preservation), 22 client checks and 91 mailbox/policy/recovery checks. New native inspection fields and non-pausing status are compiled but not live-validated. Game was running during packaging; no DLL replacement or gameplay action performed.
+
+## 0.4.6-coach.1 offline validation
+
+Build succeeded against the installed Game.dll. 154 offline checks passed: 99 native-independent mailbox/policy/recovery checks (including 8 development eligibility cases), 26 coach checks, 22 client checks and 7 response-guidance checks. New cases cover prerequisite/service gating, insufficient points, pending/already-unlocked nodes, invalid cost, all-service catalog and accepted-versus-verified purchase guidance.
+
+Game is running, so the new DLL is staged and not installed. Native development queries/purchases still require live validation after installation. No city points spent during this work.

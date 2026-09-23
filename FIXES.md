@@ -46,3 +46,11 @@ Unresolved live validation: native zone preview/cancel cleanup and attached wate
 Consumer electricity snapshots in inspect/buildings and doctor; edge coordinate aliases and inspection geometry; non-pausing get_status/coach status; explicit diagnosis coverage and native decoration exclusion; under-construction presence; explicit settle -Reassessed; clarified preview argument examples.
 
 Not addressed by this release: live UI notification extraction, construction progress/blocker reasons, unlock milestone requirements, true consumer-to-network mapping and electricity flow attribution. Existing native pipe snapping limitation remains. No claim that unknown fields or no recognised issue certify service delivery.
+
+## 0.4.6-coach.1 progression
+
+Added non-pausing get_devtree / coach unlocks with distinct cityXp and developmentPoints, native node identities, costs, service/prerequisite gates and eligibility blockers. purchase_node uses the native purchase path with a required maxPoints ceiling, validates node identity, and retains uncertain attempts to block repeat purchases. Pending purchases require explicit subsequent lock verification; no points are granted or locks bypassed. Native eligibility in the installed assembly uses any unlocked prerequisite (or none).
+
+Added catalog -All for service discovery and PROGRESSION.md linked from the agent entry instructions. Guide rejects unsupported claims about short simulation windows, perfect utilities and XP being spendable.
+
+Purchase verification is session-local; after loading another save, reconcile current locks/points before acting. A node's service is an eligibility gate, not a complete building-unlock mapping. Live progression purchases remain untested.

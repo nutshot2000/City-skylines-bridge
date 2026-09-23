@@ -1,6 +1,12 @@
 # Shared response guidance. No game calls, retries or mutations.
 function Get-AgentGuidance([string]$Status,[string]$ErrorText='',[string]$Id='',[string]$Poll='get_operation') {
  $g=[ordered]@{outcome='unknown';retryOriginal=$false;nextAction='Inspect the original response and current state; do not repeat a mutation.';nextCommand=$null}
+ if($Status -eq 'accepted_pending_verification'){
+  $g.outcome='still_running';$g.nextAction='Purchase submitted, unlock not yet verified. Read get_devtree; do not repeat the purchase. Follow PROGRESSION.md.';$g.nextCommand=@{script='agent.ps1';command='get_devtree';args=@{}};return $g
+ }
+ if($ErrorText -match 'devtree|development_|service_gate_locked'){
+  $g.outcome='needs_input';$g.nextAction='Read progression node eligibility and actual developmentPoints. Building IDs and city XP cannot be used to buy a node. Do not repeat pending purchases.';$g.nextCommand=@{script='agent.ps1';command='get_devtree';args=@{}};return $g
+ }
  if($Status -in @('queued','running','validating','applying','pending_do_not_resubmit')){
   $g.outcome='still_running';$g.nextAction='Poll the same operation once, then report progress. Do not resubmit.'
   if($Id){$g.nextCommand=@{script='agent.ps1';command=$Poll;args=@{id=$Id}}}

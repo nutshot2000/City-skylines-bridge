@@ -63,4 +63,10 @@ Check (@($script:calls|Where-Object {$_ -eq 'place_building'}).Count -eq 1) 'sav
 $script:buildStatus='running';$r=Await 'build' 'get_operation' 0
 Check ($r.status -eq 'pending_do_not_resubmit' -and $r.id -eq 'build') 'poll deadline retains original operation ID'
 Check (@($script:calls|Where-Object {$_ -eq 'place_building'}).Count -eq 1) 'poll timeout never resubmits mutation'
+function Call([string]$Command,[hashtable]$Data=@{}) { return @{prefabs=@(@{index=10;version=1;name='MedicalClinic01';kind='building';locked=$true})} }
+$All=$false
+Check (@(Catalog 'MedicalClinic').Count -eq 0) 'default catalog remains utilities-only'
+$All=$true
+$catalogRows=@(Catalog 'MedicalClinic')
+Check ($catalogRows.Count -eq 1 -and $catalogRows[0].name -eq 'MedicalClinic01' -and $catalogRows[0].locked) 'all catalog exposes service and preserves lock evidence'
 Write-Output "$script:checks checks passed. No game commands sent. Fixtures: $tmp"

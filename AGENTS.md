@@ -16,3 +16,5 @@ Your job is to establish and verify one utility chain at a time. Do not invent p
 12. Report four facts: what was built, what connection was verified, whether actual supply was observed, and the next unresolved issue. Keep infrastructure claims separate from simulation success.
 
 Original package rules still apply. This kit is an optional convenience layer, not an autonomous city builder.
+
+For locked services, read PROGRESSION.md and use coach.ps1 unlocks. City XP is not spendable development points. Never use building IDs for purchase_node.

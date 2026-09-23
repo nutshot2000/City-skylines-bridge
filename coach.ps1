@@ -1,7 +1,7 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param(
- [ValidateSet('status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
+ [ValidateSet('unlocks','status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
  [string]$Filter='', [int]$Index=0, [int]$Version=0,
  [double]$X=0, [double]$Z=0, [int]$Radius=120,
  [int]$FromIndex=0,[int]$FromVersion=0,[int]$ToIndex=0,[int]$ToVersion=0,
@@ -9,7 +9,7 @@ param(
  [string]$PlanPath='', [string]$OperationId='', [ValidateSet('operation','batch','simulation')][string]$Kind='operation',
  [string]$MailboxPath=(Join-Path $env:LOCALAPPDATA 'CitiesIIAgentBridge'),
  [string]$RecordPath=(Join-Path $PSScriptRoot 'records'),
- [switch]$Reassessed, [switch]$LibraryOnly
+ [switch]$All, [switch]$Reassessed, [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'response-guide.ps1')
@@ -89,6 +89,7 @@ function Diagnose($City,$Buildings,$Diagnostics) {
 }
 function Catalog([string]$Text) {
  $p=Call get_build_prefabs @{filter=$Text}
+ if($All){return @($p.prefabs|Select-Object index,version,name,kind,locked)}
  @($p.prefabs|Where-Object { $_.kind -in @('building','network') -and $_.name -match 'WaterTower|WaterPumping|GroundwaterPumping|WastewaterTreatment|SewageOutlet|Water Pipe|Sewage Pipe|WindTurbine|PowerStation|PowerPlant|TransformerStation|Electricity Cable|Power Line|Voltage' -and $_.name -notmatch 'Additional|Extra|Advanced|Upgrade' }|Select-Object index,version,name,kind,locked)
 }
 function ResolvePrefab([string]$Name,[string]$Kind) {
@@ -160,6 +161,7 @@ function ApplyPlan {
 if($LibraryOnly){return}
 try {
  $result=switch($Action) {
+  'unlocks' {Call get_devtree}
   'status' {Call get_status}
   'zones' {Call get_zone_catalog}
   'nearby' {if(!$PSBoundParameters.ContainsKey('X') -or !$PSBoundParameters.ContainsKey('Z')){throw 'Supply -X and -Z from current city observations.'};Call get_nearby_infrastructure @{x=$X;z=$Z}}
@@ -188,7 +190,7 @@ try {
    if((Session).citySession -ne $s.citySession){throw 'City changed during inspection. Discard mixed observations.'}
    $r=Diagnose $city $buildings $diag; $r.diagnosticError=$diagnosticError; $r.stopLatched=Test-Path (Join-Path $MailboxPath 'STOP'); $r
   }
-  'catalog' { @{assets=@(Catalog $Filter);next='Copy an exact unlocked name. Building IDs and network connector IDs are different.'} }
+  'catalog' { @{assets=@(Catalog $Filter);scope=if($All){'all_prefab_kinds'}else{'utilities_only'};next='For clinics, cemeteries or other services use catalog -All -Filter NAME. An empty utility catalog does not mean a service is absent or locked. Copy current index/version; building, node and development-tree IDs are different.'} }
   'inspect' {
    if($Index -le 0 -or $Version -le 0){throw 'Supply -Index and -Version from current observations.'}
    $entity=Call inspect_entity @{index=$Index;version=$Version}
