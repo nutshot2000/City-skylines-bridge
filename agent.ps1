@@ -8,6 +8,7 @@ param(
  [string]$RecordPath=(Join-Path $PSScriptRoot 'records')
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'response-guide.ps1')
 $client=Join-Path $PSScriptRoot 'bridge-client.ps1'
 function Send([string]$Name,[string]$Json) {
  $raw=& $client $Name -ArgsJson $Json -MailboxPath $MailboxPath
@@ -31,7 +32,7 @@ try {
  $progressAt=[DateTime]::UtcNow.AddSeconds(5)
  while($poll -and $result.status -in @('queued','running','validating','applying')) {
   if([DateTime]::UtcNow -ge $end){
-   @{status='pending_do_not_resubmit';operationId=$id;pollCommand=$poll;next="Run agent.ps1 -Command $poll -ArgsJson '{`"id`":`"$id`"}'. Do not repeat $Command."}|ConvertTo-Json -Depth 5
+   @{guidance=(Get-AgentGuidance 'pending_do_not_resubmit' '' $id $poll);status='pending_do_not_resubmit';operationId=$id;pollCommand=$poll;next="Run agent.ps1 -Command $poll -ArgsJson '{`"id`":`"$id`"}'. Do not repeat $Command."}|ConvertTo-Json -Depth 5
    exit 2
   }
   if([DateTime]::UtcNow -ge $progressAt){[Console]::Error.WriteLine("Still waiting for $poll $id ($($result.status)); no construction is being repeated.");$progressAt=[DateTime]::UtcNow.AddSeconds(5)}
@@ -49,9 +50,9 @@ try {
   if(!$result.PSObject.Properties['completedCount']){$result|Add-Member completedCount $result.completed}
   if(!$result.PSObject.Properties['failureIndex']){$result|Add-Member failureIndex $result.failedStep}
  }
- @{status=if($result.status){$result.status}else{'response_received'};result=$result;note='Completion is verified only for the requested operation. Utility delivery and resident access need separate observations.'}|ConvertTo-Json -Depth 60
+ @{guidance=(Get-AgentGuidance $(if($result.status){$result.status}else{'response_received'}) $result.error $id $poll);status=if($result.status){$result.status}else{'response_received'};result=$result;note='Completion is verified only for the requested operation. Utility delivery and resident access need separate observations.'}|ConvertTo-Json -Depth 60
  if($result.status -in @('failed','interrupted')){exit 1}
 } catch {
- @{status=if($_.Exception.Message -match 'stagnant|reassess_required'){'stagnant_no_progress'}elseif($_.Exception.Message -match 'zone_has_no_growables|use_zoning_for_growables'){'invalid_zone'}elseif($_.Exception.Message -match 'finish_or_cancel|construction_busy|tool_operation'){'tool_busy'}else{'failed_or_outcome_unknown'};error=$_.Exception.Message;next='Inspect the original response/operation. Never automatically repeat a mutation.'}|ConvertTo-Json
+ @{guidance=(Get-AgentGuidance 'unknown' $_.Exception.Message);status=if($_.Exception.Message -match 'stagnant|reassess_required'){'stagnant_no_progress'}elseif($_.Exception.Message -match 'zone_has_no_growables|use_zoning_for_growables'){'invalid_zone'}elseif($_.Exception.Message -match 'finish_or_cancel|construction_busy|tool_operation'){'tool_busy'}else{'failed_or_outcome_unknown'};error=$_.Exception.Message;next='Inspect the original response/operation. Never automatically repeat a mutation.'}|ConvertTo-Json
  exit 1
 }

@@ -69,3 +69,11 @@ preview_building takes the same arguments as place_building, with a `position` o
 ```
 
 Zoning catalog uses index/version as prefab identity; it has no zoneId field. Cell zone values are a different namespace. Use matchingGrowables and usable when choosing the prefab.
+
+## Consistent helper guidance
+
+agent.ps1 and coach.ps1 add a guidance object while preserving existing result/status fields. guidance.outcome is completed, still_running, needs_input, failed or unknown. Completed means the request completed, not verified gameplay success. Unmapped states remain unknown.
+
+guidance.nextAction explains what to inspect or supply. When a concrete next read is known, nextCommand includes script, command and args; pending operations retain their original ID. Suggestions are not executed automatically. retryOriginal is always false: fix preconditions and inspect evidence before choosing a new action. Errors after application or missing results remain uncertain.
+
+Keep response-guide.ps1 beside the helper scripts. This helper-only update requires no game restart; the separate 0.4.5 DLL upgrade still requires installation while the game is closed.

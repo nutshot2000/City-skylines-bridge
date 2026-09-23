@@ -12,6 +12,7 @@ param(
  [switch]$Reassessed, [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'response-guide.ps1')
 
 
 function Read-MailboxText([string]$Path) {
@@ -232,8 +233,9 @@ try {
    @{status=$done.status;reason=$done.reason;paused=$done.paused;advancedFrames=$done.advancedFrames;delta=$done.delta;next='Run doctor. This short interval may be insufficient; unchanged readings are inconclusive, not proof of success.'}
   }
  }
+ if($result -is [System.Collections.IDictionary]){$result['guidance']=Get-AgentGuidance $result.status $result.error $result.id}else{$result|Add-Member -NotePropertyName guidance -NotePropertyValue (Get-AgentGuidance $result.status $result.error $result.id) -Force}
  $result|ConvertTo-Json -Depth 40
 } catch {
- @{status=if($_.Exception.Message -match 'stagnant|reassess_required'){'stagnant_no_progress'}elseif($_.Exception.Message -match 'zone_has_no_growables|use_zoning_for_growables'){'invalid_zone'}elseif($_.Exception.Message -match 'finish_or_cancel|construction_busy|tool_operation'){'tool_busy'}else{'blocked_or_unknown'};error=$_.Exception.Message;next='Fix the stated precondition. If a request may have been sent, inspect its response/operation before doing anything again.'}|ConvertTo-Json -Depth 5
+ @{guidance=(Get-AgentGuidance 'unknown' $_.Exception.Message);status=if($_.Exception.Message -match 'stagnant|reassess_required'){'stagnant_no_progress'}elseif($_.Exception.Message -match 'zone_has_no_growables|use_zoning_for_growables'){'invalid_zone'}elseif($_.Exception.Message -match 'finish_or_cancel|construction_busy|tool_operation'){'tool_busy'}else{'blocked_or_unknown'};error=$_.Exception.Message;next='Fix the stated precondition. If a request may have been sent, inspect its response/operation before doing anything again.'}|ConvertTo-Json -Depth 5
  exit 1
 }

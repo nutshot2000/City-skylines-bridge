@@ -1,0 +1,15 @@
+$ErrorActionPreference='Stop'
+. "$PSScriptRoot/response-guide.ps1"
+function Check($ok,$name){if(!$ok){throw "FAIL: $name"};Write-Output "PASS: $name"}
+$g=Get-AgentGuidance 'pending_do_not_resubmit' '' 'original-id' 'get_batch'
+Check ($g.outcome -eq 'still_running' -and $g.nextCommand.args.id -eq 'original-id' -and $g.nextCommand.command -eq 'get_batch' -and !$g.retryOriginal) 'pending work retains exact polling identity'
+$g=Get-AgentGuidance 'failed' 'attachment_not_verified_after_apply'
+Check ($g.outcome -eq 'unknown') 'post-apply uncertainty cannot become a safe retry'
+$g=Get-AgentGuidance 'failed' 'zone_has_no_growables'
+Check ($g.outcome -eq 'needs_input' -and $g.nextCommand.command -eq 'get_zone_catalog') 'invalid zoning directs discovery'
+$g=Get-AgentGuidance 'unknown' 'result_missing'
+Check ($g.outcome -eq 'unknown' -and !$g.retryOriginal) 'missing results remain uncertain'
+$g=Get-AgentGuidance 'complete'
+Check ($g.outcome -eq 'completed' -and $g.nextAction -match 'separate evidence') 'completion does not certify gameplay'
+$g=Get-AgentGuidance 'unknown' 'point_required'
+Check ($g.outcome -eq 'needs_input' -and $g.nextAction -match 'position') 'argument errors explain required shape'
