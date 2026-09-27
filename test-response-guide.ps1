@@ -15,3 +15,7 @@ $g=Get-AgentGuidance 'unknown' 'point_required'
 Check ($g.outcome -eq 'needs_input' -and $g.nextAction -match 'position') 'argument errors explain required shape'
 $g=Get-AgentGuidance 'accepted_pending_verification'
 Check ($g.outcome -eq 'still_running' -and $g.nextCommand.command -eq 'get_devtree' -and !$g.retryOriginal) 'purchase acceptance is not unlock completion'
+
+$g=Get-AgentGuidance 'failed' 'preview_not_supported_for_build_network'
+if($g.outcome -ne 'needs_input' -or $g.retryOriginal -or $g.nextAction -notmatch 'Do not remove previewOnly'){throw 'preview guidance unsafe'}
+Write-Output 'PASS: unsupported preview never suggests real construction retry'

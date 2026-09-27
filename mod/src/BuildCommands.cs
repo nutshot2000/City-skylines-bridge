@@ -98,9 +98,10 @@ namespace CitiesIIAgentBridge
             var w = RequireCity(); var em = w.EntityManager; var rows = new JArray();
             var center = new float3(RequiredFloat(args, "x"), 0, RequiredFloat(args, "z"));
             float radius = RequiredFloat(args, "radius"); if (radius <= 0 || radius > 1000) throw new ArgumentException("radius_must_be_0_to_1000");
-            using (var q = em.CreateEntityQuery(new EntityQueryDesc { All = new[] { ComponentType.ReadOnly<Game.Net.Node>() }, None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Game.Common.Deleted>(), ComponentType.ReadOnly<Game.Common.Owner>() } }))
+            using (var q = em.CreateEntityQuery(new EntityQueryDesc { All = new[] { ComponentType.ReadOnly<Game.Net.Node>() }, None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Game.Common.Deleted>() } }))
             using (var es = q.ToEntityArray(Allocator.Temp)) foreach (var e in es)
             {
+                if (em.HasComponent<Game.Common.Owner>(e) && !((bool?)args["includeOwned"] ?? (bool?)args["include_own"] ?? false)) continue;
                 var n = em.GetComponentData<Game.Net.Node>(e); if (math.distance(n.m_Position.xz, center.xz) > radius) continue;
                 var edges = new JArray();
                 if (em.HasBuffer<Game.Net.ConnectedEdge>(e)) foreach (var edge in em.GetBuffer<Game.Net.ConnectedEdge>(e, true))

@@ -20,6 +20,15 @@ Check ($bytes.Length -eq [Text.Encoding]::UTF8.GetByteCount([Text.Encoding]::UTF
 $failed=$false;try{Convert-RequestBytes @{data=('x'*17000)}|Out-Null}catch{$failed=$true}
 Check $failed 'oversized packet rejected before file write'
 # Synthetic server tests terrain chunking and async wrapper polling, never the game.
+foreach($packet in @(
+ @{command='build_network';args=@{previewOnly=$true}},
+ @{command='batch_execute';args=@{previewOnly=$true;steps=@()}},
+ @{command='batch_execute';args=@{steps=@(@{command='build_network';args=@{}},@{command='build_network';args=@{previewOnly=$true}})}},
+ @{command='build_network';args=@{previewOnly='true'}}
+)) {
+ $failed=$false;try{Convert-RequestBytes $packet|Out-Null}catch{$failed=$_.Exception.Message -match 'preview'}
+ Check $failed 'unsafe preview rejected locally before request serialization'
+}
 $root=Join-Path ([IO.Path]::GetTempPath()) ('coach-protocol-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force "$root/requests","$root/responses"|Out-Null
 $job=Start-Job -ArgumentList $root -ScriptBlock {

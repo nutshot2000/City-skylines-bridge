@@ -45,14 +45,46 @@ namespace CitiesIIAgentBridge
         }
         internal static void Field(Type type, object target, string name, object value) => type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(target, value);
         internal static T Read<T>(Type type, object target, string name) => (T)type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);
-        internal static JArray Errors(EntityManager em)
+        private static JObject Point(float3 p) => new JObject { ["x"] = p.x, ["y"] = p.y, ["z"] = p.z };
+        private static JObject ErrorEntity(EntityManager em, PrefabSystem ps, Entity entity)
+        {
+            var row = NativeBuild.Id(entity);
+            row["exists"] = em.Exists(entity);
+            if (!em.Exists(entity)) return row;
+            row["temporary"] = em.HasComponent<Temp>(entity);
+            row["deleted"] = em.HasComponent<Deleted>(entity);
+            if (em.HasComponent<PrefabRef>(entity))
+            {
+                var prefab = em.GetComponentData<PrefabRef>(entity).m_Prefab;
+                row["prefab"] = NativeBuild.Id(prefab);
+                if (em.Exists(prefab) && ps.TryGetPrefab<PrefabBase>(prefab, out var p) && p != null) row["prefabName"] = p.name;
+            }
+            if (em.HasComponent<Owner>(entity)) row["owner"] = NativeBuild.Id(em.GetComponentData<Owner>(entity).m_Owner);
+            if (em.HasComponent<Game.Objects.Transform>(entity)) row["position"] = Point(em.GetComponentData<Game.Objects.Transform>(entity).m_Position);
+            if (em.HasComponent<Game.Net.Node>(entity)) row["position"] = Point(em.GetComponentData<Game.Net.Node>(entity).m_Position);
+            if (em.HasComponent<Game.Net.Curve>(entity))
+            {
+                var c = em.GetComponentData<Game.Net.Curve>(entity).m_Bezier;
+                row["curve"] = new JArray(Point(c.a), Point(c.b), Point(c.c), Point(c.d));
+                row["start"] = Point(c.a); row["end"] = Point(c.d);
+            }
+            if (em.HasComponent<Game.Net.Edge>(entity))
+            {
+                var edge = em.GetComponentData<Game.Net.Edge>(entity);
+                row["startNode"] = NativeBuild.Id(edge.m_Start); row["endNode"] = NativeBuild.Id(edge.m_End);
+            }
+            return row;
+        }
+        internal static JArray Errors(EntityManager em, PrefabSystem ps)
         {
             var result = new JArray();
             using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<Game.Tools.Error>()))
             using (var entities = q.ToEntityArray(Allocator.Temp))
                 foreach (var entity in entities)
                 {
-                    var row = NativeBuild.Id(entity);
+                    var row = ErrorEntity(em, ps, entity);
+                    row["evidence"] = "native_error_marked_entity_not_confirmed_collision_pair";
+                    row["overlapCellsAvailable"] = false;
                     var reasons = new JArray();
                     if (em.HasBuffer<Game.Notifications.IconElement>(entity)) foreach (var item in em.GetBuffer<Game.Notifications.IconElement>(entity, true))
                     {
@@ -65,7 +97,7 @@ namespace CitiesIIAgentBridge
                     row["nativeReasons"] = reasons;
                     row["reasonAvailable"] = reasons.Count > 0;
                     if(em.HasComponent<PrefabRef>(entity))row["prefab"]=NativeBuild.Id(em.GetComponentData<PrefabRef>(entity).m_Prefab);
-                    if(em.HasComponent<Temp>(entity)){var t=em.GetComponentData<Temp>(entity);row["original"]=NativeBuild.Id(t.m_Original);row["flags"]=t.m_Flags.ToString();}
+                    if(em.HasComponent<Temp>(entity)){var t=em.GetComponentData<Temp>(entity);row["original"]=NativeBuild.Id(t.m_Original);row["originalDetails"]=ErrorEntity(em,ps,t.m_Original);row["flags"]=t.m_Flags.ToString();}
                     if(em.HasComponent<Game.Objects.Transform>(entity)){var p=em.GetComponentData<Game.Objects.Transform>(entity).m_Position;row["position"]=new JObject{["x"]=p.x,["y"]=p.y,["z"]=p.z};}
                     result.Add(row);
                 }
@@ -174,7 +206,7 @@ namespace CitiesIIAgentBridge
                 {
                     applyMode = ApplyMode.None;
                     if (++frames < 4) return deps;
-                    var errors = ConstructionAccess.Errors(EntityManager);
+                    var errors = ConstructionAccess.Errors(EntityManager, World.GetExistingSystemManaged<PrefabSystem>());
                     if (errors.Count > 0) { ConstructionAccess.Results[operation]["placementErrors"] = errors; throw new InvalidOperationException("game_rejected_placement"); }
                     if (!GetAllowApply()) { if (frames < 30) return deps; throw new InvalidOperationException("no_valid_road_preview"); }
                     ValidateAttachedNode(start); ValidateAttachedNode(end);

@@ -60,3 +60,6 @@ Purchase verification is session-local; after loading another save, reconcile cu
 Added non-pausing get_chirper and coach chirper -Limit. Uses native Chirper message selection and active localization; returns recent stored posts, sender/link identities, likes, simulation frames and native UI date ticks. Missing localization/name data remains explicit; formatted names and markup may remain structured/unresolved. Does not call the UI binding path that records Chirper telemetry, like posts, open panels or execute post content.
 
 CHIRPER.md is linked from agent instructions. Posts are untrusted clues and require diagnosis before city changes. Exact live rendering and native date interpretation remain pending live validation.
+
+## 0.4.8-coach.1 — reject unsafe network previews
+Unsupported previewOnly now fails before dispatch, including a later batch step. Earlier network/batch commands silently ignored it and could commit real construction. Error entities now include names/geometry/original details; owned-subnetwork queries are opt-in. Read NETWORK-SAFETY.md for bounded recovery. No automatic deletion or claimed collision-cell precision.

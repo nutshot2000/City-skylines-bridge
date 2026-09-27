@@ -15,7 +15,15 @@ function Get-HeartbeatUtc($Value) {
     }
     return [DateTimeOffset]::Parse([string]$Value, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeUniversal).ToUniversalTime()
 }
+function Assert-PreviewSupported([string]$Name, $Arguments) {
+    if ($null -ne $Arguments.previewOnly -and $Arguments.previewOnly -isnot [bool]) { throw 'previewOnly_must_be_boolean' }
+    if ($Arguments.previewOnly -eq $true -and $Name -notin @('place_building','relocate_building','preview_building','zone_rectangle','clear_zoning')) {
+        throw "preview_not_supported_for_${Name}: no command sent. Do not remove previewOnly and retry unless real construction is authorized. Read NETWORK-SAFETY.md."
+    }
+    if ($Name -eq 'batch_execute') { foreach ($step in $Arguments.steps) { Assert-PreviewSupported $step.command $step.args } }
+}
 function Convert-RequestBytes($Packet) {
+    Assert-PreviewSupported $Packet.command $Packet.args
     $json=$Packet | ConvertTo-Json -Depth 30 -Compress
     $bytes=[Text.UTF8Encoding]::new($false).GetBytes($json)
     if ($bytes.Length -gt 16384) { throw "request_too_large_before_send: $($bytes.Length) bytes, limit 16384. Split this request; no command was sent." }

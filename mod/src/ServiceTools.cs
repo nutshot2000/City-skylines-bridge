@@ -101,7 +101,7 @@ namespace CitiesIIAgentBridge
                 if (stage == 1)
                 {
                     applyMode = ApplyMode.None; if (++frames < 4) return deps;
-                    var errors = ConstructionAccess.Errors(EntityManager);
+                    var errors = ConstructionAccess.Errors(EntityManager, World.GetExistingSystemManaged<PrefabSystem>());
                     if (errors.Count > 0) { if (RetryCandidate("game_rejected_placement",errors)) return deps; throw new InvalidOperationException("game_rejected_placement"); }
                     if (!GetAllowApply()) { if (frames < 30) return deps; if(RetryCandidate("invalid_building_preview",errors)) return deps; throw new InvalidOperationException("invalid_building_preview"); }
                     var points = GetControlPoints(out var ready); ready.Complete();

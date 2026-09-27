@@ -1,6 +1,9 @@
 # Shared response guidance. No game calls, retries or mutations.
 function Get-AgentGuidance([string]$Status,[string]$ErrorText='',[string]$Id='',[string]$Poll='get_operation') {
  $g=[ordered]@{outcome='unknown';retryOriginal=$false;nextAction='Inspect the original response and current state; do not repeat a mutation.';nextCommand=$null}
+ if($ErrorText -match 'preview_not_supported|previewOnly_must_be_boolean'){
+  $g.outcome='needs_input';$g.nextAction='Read NETWORK-SAFETY.md. Network and batch dry runs are unsupported. Do not remove previewOnly to bypass this guard. Older createdRoads preview receipts may be real construction; inspect before any removal.';return $g
+ }
  if($Status -eq 'accepted_pending_verification'){
   $g.outcome='still_running';$g.nextAction='Purchase submitted, unlock not yet verified. Read get_devtree; do not repeat the purchase. Follow PROGRESSION.md.';$g.nextCommand=@{script='agent.ps1';command='get_devtree';args=@{}};return $g
  }

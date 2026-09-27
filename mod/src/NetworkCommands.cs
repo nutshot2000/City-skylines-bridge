@@ -19,12 +19,15 @@ namespace CitiesIIAgentBridge
             var w = RequireCity(); var em = w.EntityManager; var ps = w.GetExistingSystemManaged<PrefabSystem>(); var rows = new JArray();
             float2 center = new float2(RequiredFloat(args, "x"), RequiredFloat(args, "z")); float radius = RequiredFloat(args, "radius");
             if (radius <= 0 || radius > 2000) throw new ArgumentException("invalid_radius");
-            using (var q = em.CreateEntityQuery(new EntityQueryDesc { All = new[] { ComponentType.ReadOnly<Game.Net.Edge>(), ComponentType.ReadOnly<Game.Net.Curve>() }, None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Deleted>(), ComponentType.ReadOnly<Owner>() } }))
+            using (var q = em.CreateEntityQuery(new EntityQueryDesc { All = new[] { ComponentType.ReadOnly<Game.Net.Edge>(), ComponentType.ReadOnly<Game.Net.Curve>() }, None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Deleted>() } }))
             using (var es = q.ToEntityArray(Allocator.Temp)) foreach (var e in es)
             {
+                if (em.HasComponent<Owner>(e) && !((bool?)args["includeOwned"] ?? (bool?)args["include_own"] ?? false)) continue;
                 var curve = em.GetComponentData<Game.Net.Curve>(e); if (math.distance((curve.m_Bezier.a.xz + curve.m_Bezier.d.xz) * 0.5f, center) > radius + curve.m_Length * 0.5f) continue;
                 var edge = em.GetComponentData<Game.Net.Edge>(e); var info = NativeBuild.Id(e);
                 info["prefab"] = ps.GetPrefabName(em.GetComponentData<PrefabRef>(e).m_Prefab);
+                info["ownedSubnetwork"] = em.HasComponent<Owner>(e);
+                if (em.HasComponent<Owner>(e)) info["owner"] = NativeBuild.Id(em.GetComponentData<Owner>(e).m_Owner);
                 info["prefabName"] = info["prefab"].DeepClone(); info["startNode"] = NativeBuild.Id(edge.m_Start); info["endNode"] = NativeBuild.Id(edge.m_End); info["length"] = curve.m_Length;
                 info["start"] = Vector(curve.m_Bezier.a); info["end"] = Vector(curve.m_Bezier.d);
                 info["curve"] = new JArray(Vector(curve.m_Bezier.a), Vector(curve.m_Bezier.b), Vector(curve.m_Bezier.c), Vector(curve.m_Bezier.d));

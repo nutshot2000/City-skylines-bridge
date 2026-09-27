@@ -68,3 +68,6 @@ Compiled against the installed game assembly. 66 helper checks passed (23 client
 ## 0.4.7-coach.2 Chirper hotfix
 
 Confirmed in the installed game assembly: ChirperUISystem.GetMessageID(Entity) is public; GetTicks(uint) is private. Replaced the incorrect non-public reflection lookup with a direct public GetMessageID call. Compilation now checks the method signature/visibility instead of discovering this mismatch at runtime. GetTicks retains its private reflection lookup. Build passed; live Chirper output still needs retesting.
+
+## 0.4.8-coach.1
+Compiled against the installed game assemblies. Offline checks: 114 C# checks (including 15 preview policy cases), 27 client checks (including 4 local preview guards), 26 coach, 8 response guidance and 10 building-report checks. Updated client blocks unsupported previews even against an older installed DLL. Native error geometry and owned-subnetwork visibility require live validation after DLL installation. Game was running; no city entities removed or construction attempted. No standalone network dry run or exact collision-cell reporting is claimed.
