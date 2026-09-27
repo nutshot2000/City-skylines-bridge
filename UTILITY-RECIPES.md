@@ -55,3 +55,5 @@
 5. **No demand or incomplete data?** State “not yet proven,” identify the missing observation and stop speculative construction.
 
 Do not promise a functioning neighborhood from these helpers alone. They assist discovery, planning, waiting and interpretation; they do not solve arbitrary terrain routing or certify utility delivery.
+
+For the exact bounded helper workflow and interpretation of connection-check, read UTILITY-PLAYBOOK.md. Network apply automatically checks the endpoint path; raw build commands do not.

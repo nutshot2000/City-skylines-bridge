@@ -55,3 +55,5 @@ Locked clinic/cemetery or progression questions: read PROGRESSION.md. Use coach.
 For one building's warnings or construction trouble, use coach.ps1 building -Index CURRENT_BUILDING_INDEX -Version CURRENT_VERSION. Read BUILDING-DIAGNOSIS.md; do not start a broad command hunt.
 
 Resident sidebar comments: coach.ps1 chirper -Limit 20, with DLL 0.4.7 or newer. Read CHIRPER.md before acting on posts.
+
+Utilities: follow UTILITY-PLAYBOOK.md. Use coach.ps1 connection-check with both current node index/version pairs. It distinguishes a missing connection from physical adjacency with unverified supply. Do not lay another pipe until the previous link has been checked.

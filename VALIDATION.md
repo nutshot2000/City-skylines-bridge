@@ -71,3 +71,5 @@ Confirmed in the installed game assembly: ChirperUISystem.GetMessageID(Entity) i
 
 ## 0.4.8-coach.1
 Compiled against the installed game assemblies. Offline checks: 114 C# checks (including 15 preview policy cases), 27 client checks (including 4 local preview guards), 26 coach, 8 response guidance and 10 building-report checks. Updated client blocks unsupported previews even against an older installed DLL. Native error geometry and owned-subnetwork visibility require live validation after DLL installation. Game was running; no city entities removed or construction attempted. No standalone network dry run or exact collision-cell reporting is claimed.
+
+Utility helper follow-up: 9 connection-report fixtures and 31 coach checks passed, including disconnected post-build results, duplicate-path prevention and receipt persistence. No live city commands were sent; actual utility delivery is not claimed.

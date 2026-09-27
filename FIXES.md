@@ -63,3 +63,6 @@ CHIRPER.md is linked from agent instructions. Posts are untrusted clues and requ
 
 ## 0.4.8-coach.1 — reject unsafe network previews
 Unsupported previewOnly now fails before dispatch, including a later batch step. Earlier network/batch commands silently ignored it and could commit real construction. Error entities now include names/geometry/original details; owned-subnetwork queries are opt-in. Read NETWORK-SAFETY.md for bounded recovery. No automatic deletion or claimed collision-cell precision.
+
+## Utility helper follow-up
+Added connection-check (three reads maximum), automatic post-build endpoint-path verification, and a fresh pre-build duplicate-path check. Inspect requests owned utility subnetworks. UTILITY-PLAYBOOK.md gives agents a source-to-consumer workflow, explicit stop conditions and separate built/connected/supplying evidence. No DLL changes in this follow-up.

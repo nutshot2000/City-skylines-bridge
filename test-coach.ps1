@@ -69,4 +69,27 @@ Check (@(Catalog 'MedicalClinic').Count -eq 0) 'default catalog remains utilitie
 $All=$true
 $catalogRows=@(Catalog 'MedicalClinic')
 Check ($catalogRows.Count -eq 1 -and $catalogRows[0].name -eq 'MedicalClinic01' -and $catalogRows[0].locked) 'all catalog exposes service and preserves lock evidence'
+$script:networkBuilds=0;$script:traceCount=0;$script:alreadyConnected=$false
+function Call([string]$Command,[hashtable]$Data=@{}) {
+ switch($Command){
+  'get_city_state' {return @{money=1000}}
+  'save_checkpoint' {return @{id='save'}}
+  'get_operation' {return @{id=$Data.id;status='complete';saveName='fixture-save';createdRoads=@(@{index=7;version=1})}}
+  'get_prefab_details' {return @{name='Small Water Pipe';locked=$false}}
+  'inspect_entity' {return @{index=$Data.index;version=$Data.version;position=@{x=($Data.index*20);y=-10;z=0};components=@('Game.Net.Node','Game.Simulation.WaterPipeNodeConnection')}}
+  'trace_network' {$script:traceCount++;return @{connected=$script:alreadyConnected;visited=2;edges=@()}}
+  'build_network' {$script:networkBuilds++;return @{id='network';status='queued'}}
+  default {throw "Unexpected mocked command: $Command"}
+ }
+}
+$p=@{schema=1;id=[guid]::NewGuid().ToString('N');session='s';citySession='c';expiresUtc=[DateTimeOffset]::UtcNow.AddMinutes(5).ToString('O');command='build_network';prefabName='Small Water Pipe';reserve=500;args=@{maxCost=100;prefabIndex=10;prefabVersion=1;elevation=0;start=@{index=1;version=1};end=@{index=2;version=1}}}
+$PlanPath=Join-Path $tmp 'network.json';$p|ConvertTo-Json -Depth 10|Set-Content $PlanPath
+$r=ApplyPlan
+Check ($r.status -eq 'review_needed' -and $r.operation.status -eq 'complete' -and $r.connectionVerification.status -eq 'disconnected_stop') 'completed build with missing path is review-needed not utility success'
+Check ($script:traceCount -eq 2 -and $script:networkBuilds -eq 1) 'network apply checks path before and after one build'
+$saved=Get-Content (Join-Path $RecordPath "attempts/$($p.id).json") -Raw|ConvertFrom-Json
+Check ($saved.connectionVerification.status -eq 'disconnected_stop') 'connection failure retained with original operation receipt'
+$script:alreadyConnected=$true;$p.id=[guid]::NewGuid().ToString('N');$PlanPath=Join-Path $tmp 'duplicate-network.json';$p|ConvertTo-Json -Depth 10|Set-Content $PlanPath
+Reject {ApplyPlan} 'path added since planning prevents duplicate construction'
+Check ($script:networkBuilds -eq 1) 'existing path causes no additional network mutation'
 Write-Output "$script:checks checks passed. No game commands sent. Fixtures: $tmp"

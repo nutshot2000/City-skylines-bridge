@@ -1,7 +1,7 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param(
- [ValidateSet('chirper','building','unlocks','status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
+ [ValidateSet('connection-check','chirper','building','unlocks','status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
  [ValidateRange(1,100)][int]$Limit=20, [string]$Filter='', [int]$Index=0, [int]$Version=0,
  [double]$X=0, [double]$Z=0, [int]$Radius=120,
  [int]$FromIndex=0,[int]$FromVersion=0,[int]$ToIndex=0,[int]$ToVersion=0,
@@ -14,6 +14,7 @@ param(
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'response-guide.ps1')
 . (Join-Path $PSScriptRoot 'building-report.ps1')
+. (Join-Path $PSScriptRoot 'connection-report.ps1')
 
 
 function Read-MailboxText([string]$Path) {
@@ -152,16 +153,25 @@ function ApplyPlan {
  if($p.command -eq 'build_network'){
   $a=Call inspect_entity @{index=$p.args.start.index;version=$p.args.start.version};$b=Call inspect_entity @{index=$p.args.end.index;version=$p.args.end.version}
   CheckNodes $prefab $a $b
+  $path=Call trace_network @{fromIndex=$a.index;fromVersion=$a.version;toIndex=$b.index;toVersion=$b.version}
+  if($path.connected -isnot [bool] -or $path.connected -or $null -eq $path.visited -or $path.visited -gt 100000){throw 'Path already exists or is unknown. No construction submitted; run connection-check and inspect service instead.'}
  }
  $op=Call $p.command $p.args
  $record.operationId=$op.id; $record|ConvertTo-Json -Depth 10|Set-Content $marker
  $done=Await $op.id
  $record.status=$done.status;$record.result=$done;$record|ConvertTo-Json -Depth 30|Set-Content $marker
+ if($p.command -eq 'build_network' -and $done.status -eq 'complete'){
+  [Console]::Error.WriteLine('Network built; checking the original connector nodes before any further construction.')
+  $verification=CheckUtilityConnection $p.args.start.index $p.args.start.version $p.args.end.index $p.args.end.version $s
+  $record.connectionVerification=$verification;$record|ConvertTo-Json -Depth 30|Set-Content $marker
+  return @{status='review_needed';operation=$done;checkpoint=$record.checkpoint;connectionVerification=$verification;next=$verification.next}
+ }
  return @{status=$done.status;operation=$done;checkpoint=$record.checkpoint;next='Run inspect/doctor to verify entities. Then settle once to check actual supply. Complete means native operation completed, not that utilities work.'}
 }
 if($LibraryOnly){return}
 try {
  $result=switch($Action) {
+  'connection-check' {CheckUtilityConnection $FromIndex $FromVersion $ToIndex $ToVersion}
   'chirper' {Call get_chirper @{limit=$Limit}}
   'building' {DiagnoseOneBuilding $Index $Version}
   'unlocks' {Call get_devtree}
@@ -198,7 +208,7 @@ try {
    if($Index -le 0 -or $Version -le 0){throw 'Supply -Index and -Version from current observations.'}
    $entity=Call inspect_entity @{index=$Index;version=$Version}
    $network=$null;$edges=$null
-   if($entity.position){$network=Call get_network @{x=$entity.position.x;z=$entity.position.z;radius=$Radius};$edges=Call get_network_edges @{x=$entity.position.x;z=$entity.position.z;radius=$Radius}}
+   if($entity.position){$network=Call get_network @{x=$entity.position.x;z=$entity.position.z;radius=$Radius;include_own=$true};$edges=Call get_network_edges @{x=$entity.position.x;z=$entity.position.z;radius=$Radius;include_own=$true}}
    @{entity=$entity;nearbyNetwork=$network;edges=@($edges.edges|Select-Object index,version,prefab,startNode,endNode,length);next='Match node IDs to the listed edges and utility types. Do not attach a pipe to a building entity ID. The nearest node is not necessarily the right utility layer.'}
   }
   'sites' {

@@ -1,6 +1,9 @@
 # Shared response guidance. No game calls, retries or mutations.
 function Get-AgentGuidance([string]$Status,[string]$ErrorText='',[string]$Id='',[string]$Poll='get_operation') {
  $g=[ordered]@{outcome='unknown';retryOriginal=$false;nextAction='Inspect the original response and current state; do not repeat a mutation.';nextCommand=$null}
+ if($Status -in @('connection_unknown_stop','disconnected_stop','physical_path_found_supply_unverified','review_needed')){
+  $g.outcome='needs_input';$g.nextAction='Read the connectionVerification and next fields. Stop further construction on missing/unknown connection evidence. A physical path does not prove delivery; follow UTILITY-PLAYBOOK.md and verify consumer fulfillment.';return $g
+ }
  if($ErrorText -match 'preview_not_supported|previewOnly_must_be_boolean'){
   $g.outcome='needs_input';$g.nextAction='Read NETWORK-SAFETY.md. Network and batch dry runs are unsupported. Do not remove previewOnly to bypass this guard. Older createdRoads preview receipts may be real construction; inspect before any removal.';return $g
  }
