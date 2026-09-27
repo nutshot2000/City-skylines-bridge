@@ -66,3 +66,6 @@ Unsupported previewOnly now fails before dispatch, including a later batch step.
 
 ## Utility helper follow-up
 Added connection-check (three reads maximum), automatic post-build endpoint-path verification, and a fresh pre-build duplicate-path check. Inspect requests owned utility subnetworks. UTILITY-PLAYBOOK.md gives agents a source-to-consumer workflow, explicit stop conditions and separate built/connected/supplying evidence. No DLL changes in this follow-up.
+
+## 0.4.9-coach.1 — connector discovery and explicit-node elevation
+Added get_utility_connectors and coach connectors. Fixed explicit-node input metadata: native FixElevation can lower an already-buried position and clear its attachment when the bridge labels it surface elevation. Restore explicit node anchors after input snapping with existing burial metadata; keep preview and post-apply attachment checks. No automatic routing or delivery certification.

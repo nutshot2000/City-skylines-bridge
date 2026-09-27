@@ -51,3 +51,7 @@ If the path exists, run `settle` once and re-read the affected building. Report 
 ## Reply promptly
 
 After at most six helper calls or 45 seconds, say: what exists; whether the endpoint path was found; whether delivery was measured; and the one unresolved issue. Two identical failures mean stop and explain. Never leave the owner waiting while trying an entire grid of speculative pipes.
+
+## Connector discovery (requires DLL 0.4.9-coach.1)
+Run coach.ps1 connectors -Index <source-building> -Version <version>, then repeat for the affected consumer. Candidate attachment fields provide actual node IDs and absolute heights. The bounded search follows native subnets and the building's road reference; it does not choose the closest unrelated pipe. Compare incident-edge voltage and fresh/sewage capacity, then use connection-check. An empty or truncated result means incomplete discovery. Do not substitute guessed terrain coordinates.
+The new DLL preserves explicit node positions after input snapping and supplies native burial metadata to the game. Existing-node plans still require elevation 0. Incompatible burial ranges and any lost native attachment still fail before apply. Runtime validation status is recorded in VALIDATION.md.

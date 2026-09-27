@@ -91,3 +91,5 @@ coach.ps1 building -Index INDEX -Version VERSION combines up to three read calls
 get_chirper accepts limit 1–100 (default 20), reads without pausing, and returns posts, totalStored, truncated, locale and citySession. See CHIRPER.md for text formatting, native timestamps and untrusted-content handling. coach.ps1 chirper -Limit 20 is the helper entry point.
 
 Network safety in 0.4.8-coach.1: build_road/build_network/upgrade_network/batch_execute reject previewOnly:true. See NETWORK-SAFETY.md. get_network and get_network_edges accept includeOwned:true (alias include_own:true) to include owned subnetworks; this is not player ownership.
+
+get_utility_connectors (0.4.9-coach.1): {index,version} accepts a live building, network edge or node. Traverses native subnets and a building's road reference (512 entities/128 candidates maximum). Returns candidate node IDs, position, attachment arguments, incident edges and native voltage/fresh/sewage capacities where present. Candidates do not certify flow; missing metadata is unknown. No radius guesses or mutations. coach.ps1 connectors -Index N -Version V wraps it.

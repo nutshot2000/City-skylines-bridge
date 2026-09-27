@@ -160,6 +160,25 @@ namespace CitiesIIAgentBridge
             }
             throw new InvalidOperationException("attached_node_not_preserved_in_native_preview_inspect_node_height_and_network_do_not_retry_same_geometry");
         }
+        private ControlPoint PreserveAttachedNode(ControlPoint point)
+        {
+            var e=point.m_OriginalEntity;
+            if(!EntityManager.Exists(e)||!EntityManager.HasComponent<Game.Net.Node>(e))return point;
+            if(RequestedElevation!=0)throw new InvalidOperationException("attached_node_requires_zero_offset");
+            point.m_Position=EntityManager.GetComponentData<Game.Net.Node>(e).m_Position;
+            point.m_HitPosition=point.m_Position;
+            var terrain=World.GetExistingSystemManaged<TerrainSystem>().GetHeightData();
+            float depth=point.m_Position.y-TerrainUtils.SampleHeight(ref terrain,point.m_Position);
+            if(EntityManager.HasComponent<Game.Net.Elevation>(e))depth=math.csum(EntityManager.GetComponentData<Game.Net.Elevation>(e).m_Elevation)*0.5f;
+            if(EntityManager.HasComponent<PlaceableNetData>(expectedPrefab))
+            {
+                var range=EntityManager.GetComponentData<PlaceableNetData>(expectedPrefab).m_ElevationRange;
+                if(depth<range.min-1f || depth>range.max+1f)throw new InvalidOperationException("attached_node_depth_outside_prefab_range_choose_compatible_network");
+                depth=math.clamp(depth,range.min,range.max);
+            }
+            point.m_Elevation=depth;
+            return point;
+        }
         private void VerifyAppliedAttachment(ControlPoint point, JArray created)
         {
             var wanted = point.m_OriginalEntity;
@@ -199,6 +218,11 @@ namespace CitiesIIAgentBridge
                     ConstructionAccess.Field(typeof(NetToolSystem), this, "m_Prefab", prefab);
                     applyMode = ApplyMode.Clear;
                     deps = (JobHandle)ConstructionAccess.Call(typeof(NetToolSystem), this, "SnapControlPoints", deps, false);
+                    deps.Complete();
+                    // Native FixElevation shifts absolute positions and drops attachments when metadata says surface.
+                    // Restore explicit node anchors after input snapping, keeping actual burial metadata.
+                    points = GetControlPoints(out pointsDeps); pointsDeps.Complete();
+                    if(points.Length>=2){if(EntityManager.HasComponent<Game.Net.Node>(start.m_OriginalEntity))points[0]=PreserveAttachedNode(start);if(EntityManager.HasComponent<Game.Net.Node>(end.m_OriginalEntity))points[points.Length-1]=PreserveAttachedNode(end);}
                     deps = (JobHandle)ConstructionAccess.Call(typeof(NetToolSystem), this, "UpdateCourse", deps, false);
                     ConstructionAccess.Results[operation]["status"] = "validating"; stage = 1; return deps;
                 }

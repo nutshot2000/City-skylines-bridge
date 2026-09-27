@@ -1,7 +1,7 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param(
- [ValidateSet('connection-check','chirper','building','unlocks','status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
+ [ValidateSet('connectors','connection-check','chirper','building','unlocks','status','brief','zones','nearby','health','outside','doctor','catalog','inspect','sites','connection-plan','building-plan','apply','wait','settle')][string]$Action='doctor',
  [ValidateRange(1,100)][int]$Limit=20, [string]$Filter='', [int]$Index=0, [int]$Version=0,
  [double]$X=0, [double]$Z=0, [int]$Radius=120,
  [int]$FromIndex=0,[int]$FromVersion=0,[int]$ToIndex=0,[int]$ToVersion=0,
@@ -171,6 +171,7 @@ function ApplyPlan {
 if($LibraryOnly){return}
 try {
  $result=switch($Action) {
+  'connectors' {Call get_utility_connectors @{index=$Index;version=$Version}}
   'connection-check' {CheckUtilityConnection $FromIndex $FromVersion $ToIndex $ToVersion}
   'chirper' {Call get_chirper @{limit=$Limit}}
   'building' {DiagnoseOneBuilding $Index $Version}
