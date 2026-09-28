@@ -50,7 +50,7 @@ After that, repeat: `overview` → do the top item in NEXT → `grow` → `overv
 9. **Money:** services are expensive (a post office is $250k, a telecom tower $125k, a hospital $1.9M). `place` and `road` refuse to spend below a cash reserve (`-Reserve`, default 50,000), so the city can always pay upkeep. Early service upkeep makes the budget negative. It turns positive as population grows. Small tax nudges (`tax -Type Residential -Rate 12`) are fine.
 10. **Never resend a construction command that reported "still running".** Poll the id it gave you.
 11. **Plan for traffic early.** Build the district's main through-roads as `medium` from the start, give every district two ways out (not one spine), and add a second highway link once the city passes ~1,500 people. Join only ONE carriageway (a T-junction onto the one-way side flowing the way you want). Never cross both carriageways at grade: that puts a stop on the highway and jams it. Don't put services right beside a road you may need to widen: `upgrade` fails with `OverlapExisting` when a building is in the way. `problems` shows where "Traffic Bottleneck" icons are; widen with `upgrade -Path x,z -Type medium|large`. Large roads need the LargeRoadsNode development node (`unlocks -Filter LargeRoads`).
-12. **Don't build roads over water** unless you want a costly bridge. `road` refuses automatically; pass `-AllowWater` to override.
+12. **Don't build roads over water** unless you want a costly bridge. `road` refuses automatically; pass `-AllowWater` to override. It also refuses to cross a highway at grade (`-AllowHighway` overrides).
 
 ## When something fails
 

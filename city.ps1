@@ -21,7 +21,7 @@ param(
  [double]$Rotation=[double]::NaN, [int]$MaxCost=0, [int]$Reserve=50000,
  [int]$Seconds=60, [int]$Rate=-999, [int]$Speed=2, [int]$Limit=40, [double]$Step=100,
  [string]$Region='', [string]$Filter='', [string]$ArgsJson='{}',
- [switch]$Preview, [switch]$AllowWater, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
+ [switch]$Preview, [switch]$AllowWater, [switch]$AllowHighway, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
 $Kit=$PSScriptRoot
@@ -318,7 +318,14 @@ function Do-Road {
  if($From -and $To){$pts=@((ParsePoint $From '-From'),(ParsePoint $To '-To'))}
  if($pts.Count -lt 2){throw "Give at least two points: city.ps1 road -Path '0,1000' '0,1400' -Type small"}
  $p=Resolve-Road $(if($Type){$Type}elseif($Name){$Name}else{'small'})
- # Roads over water become costly bridges/quays; stop unless the caller really wants that.
+ # Crossing a highway at grade puts a junction (and a stop) on it and jams it; refuse unless asked.
+ if(!$AllowHighway){
+  foreach($leg in Split-Legs $pts){
+   $mid=@{x=($leg.start.x+$leg.end.x)/2;z=($leg.start.z+$leg.end.z)/2}
+   $hw=@((Bridge get_network_edges @{x=$mid.x;z=$mid.z;radius=[Math]::Min(2000,(Dist $leg.start $leg.end)/2+50)}).edges|Where-Object {$_.prefab -match 'Highway'})
+   foreach($h in $hw){ if(SegCross $leg.start $leg.end $h.start $h.end){ throw "This road would cross the highway at ($([Math]::Round(($h.start.x+$h.end.x)/2)),$([Math]::Round(($h.start.z+$h.end.z)/2))). The game joins it at grade, which stops highway traffic and jams it. End the road before the highway (a T onto one carriageway is OK), or pass -AllowHighway." } }
+  }
+ } # Roads over water become costly bridges/quays; stop unless the caller really wants that.
  if(!$AllowWater){
   $probe=@(); foreach($leg in Split-Legs $pts){ $n=[Math]::Max(2,[Math]::Ceiling((Dist $leg.start $leg.end)/25)); for($k=0;$k -le $n;$k++){ $probe+=@{x=$leg.start.x+($leg.end.x-$leg.start.x)*$k/$n;z=$leg.start.z+($leg.end.z-$leg.start.z)*$k/$n} } }
   $wet=@((Bridge sample_terrain @{points=@($probe|Select-Object -First 1024)}).samples|Where-Object {$_.waterDepth -gt 0.5})
@@ -351,6 +358,7 @@ function Do-Upgrade {
  }
  Out-Result $out { "upgrade to $($p.name):"; $out }
 }
+function SegCross($a,$b,$c,$d){ $o={param($p,$q,$r) ($q.x-$p.x)*($r.z-$p.z)-($q.z-$p.z)*($r.x-$p.x)}; $d1=& $o $c $d $a; $d2=& $o $c $d $b; $d3=& $o $a $b $c; $d4=& $o $a $b $d; return (($d1 -gt 0) -ne ($d2 -gt 0)) -and (($d3 -gt 0) -ne ($d4 -gt 0)) -and [Math]::Abs($d1) -gt 1 -and [Math]::Abs($d2) -gt 1 }
 function SegDist($p,$a,$b){ $dx=$b.x-$a.x;$dz=$b.z-$a.z;$l2=$dx*$dx+$dz*$dz; $t=if($l2 -gt 0){[Math]::Max(0.0,[Math]::Min(1.0,[double]((($p.x-$a.x)*$dx+($p.z-$a.z)*$dz)/$l2)))}else{0.0}; [Math]::Sqrt([Math]::Pow($p.x-($a.x+$t*$dx),2)+[Math]::Pow($p.z-($a.z+$t*$dz),2)) }
 
 function Do-Zone {

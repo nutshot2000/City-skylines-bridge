@@ -58,6 +58,7 @@ function Bridge([string]$Command,$Arguments=@{},[int]$Wait=60){
     return [pscustomobject]@{status='complete';previewCost=25000;createdBuildings=@([pscustomobject]@{index=77;version=2})} }
   'sample_terrain' { return [pscustomobject]@{samples=@(@($Arguments.points)|ForEach-Object {[pscustomobject]@{position=[pscustomobject]@{x=$_.x;y=380;z=$_.z};waterDepth=$(if($_.z -gt 5000){12}else{0})}})} }
   'get_status' { return [pscustomobject]@{city=[pscustomobject]@{money=$script:FakeMoney;selectedSpeed=1}} }
+  'get_network_edges' { return [pscustomobject]@{edges=@([pscustomobject]@{prefab='Highway Oneway - 2 lanes';start=[pscustomobject]@{x=-1000;z=4000};end=[pscustomobject]@{x=1000;z=4000}})} }
   'batch_execute' { return [pscustomobject]@{status='complete';steps=@($Arguments.steps).Count;completed=@($Arguments.steps).Count;moneySpent=100} }
   default { throw "unexpected command $Command" }
  }
@@ -102,6 +103,10 @@ $script:Sent.Clear(); $Path=@('0,4900','0,5200')
 Check (Throws {Do-Road} 'cross water') 'road over water is refused before building'
 Check (@($script:Sent|Where-Object command -eq 'batch_execute').Count -eq 0) 'nothing is built when water is found'
 $AllowWater=$true; $null=Do-Road; $AllowWater=$false
+$script:Sent.Clear(); $Path=@('0,3900','0,4100')
+Check (Throws {Do-Road} 'cross the highway') 'road across a highway is refused before building'
+$Path=@('0,3900','0,3990'); $null=Do-Road
+Check (@($script:Sent|Where-Object command -eq 'batch_execute').Count -eq 1) 'road ending before the highway is built'
 Check (@($script:Sent|Where-Object command -eq 'batch_execute').Count -eq 1) '-AllowWater builds the bridge anyway'
 
 "$passed city.ps1 checks passed. No game commands sent."
