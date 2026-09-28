@@ -211,6 +211,7 @@ function Do-Status {
   "$($c.cityName): population $($c.population) (+$([int]$c.populationWithMoveIn-[int]$c.population) moving in), money $([Math]::Round($c.money)), XP $($c.xp), date $($c.date), speed $($c.selectedSpeed)"
   $hb=try{Get-Content (Join-Path $Mailbox 'session.json') -Raw|ConvertFrom-Json}catch{$null}
   "happiness $($c.averageHappiness)  health $($c.averageHealth)  bridge $($hb.modVersion)  controls=$(if($c.controlEnabled){'ON'}else{'OFF (enable in Options)'})$(if($c.stopLatched){'  STOP FILE PRESENT'})"
+  if($c.pause.popupHoldingPause){"PAUSED BY A GAME POPUP (usually a milestone/unlock). A player must close it; speed changes snap back to 0 until then."}elseif($c.pause.gameWindowFocused -eq $false -and [double]$c.selectedSpeed -eq 0){"paused - the game window is not focused"}
   if($s.milestone.nextMilestone){"milestone $($s.milestone.achievedMilestone) reached; XP $($s.milestone.currentXP)/$($s.milestone.nextMilestoneXP) toward milestone $($s.milestone.nextMilestone)"}
   "tool: $($t.activeTool)$(if($t.operationId){" operation $($t.operationId)"})$(if($t.batchRunning){' batch running'})  readyForConstruction=$($t.readyForConstruction)"
  }
@@ -225,11 +226,21 @@ function Do-Speed {
 function Do-Grow {
  $before=Status; $r=Bridge set_simulation_speed @{speed=$Speed}
  $end=[DateTime]::UtcNow.AddSeconds([Math]::Max(5,[Math]::Min(600,$Seconds)))
- while([DateTime]::UtcNow -lt $end){ Start-Sleep -Seconds ([Math]::Min(15,[Math]::Max(1,($end-[DateTime]::UtcNow).TotalSeconds))) }
+ $held=$null; $nudged=$false
+ while([DateTime]::UtcNow -lt $end){
+  Start-Sleep -Seconds ([Math]::Min(15,[Math]::Max(1,($end-[DateTime]::UtcNow).TotalSeconds)))
+  $now=Status
+  if([double]$now.selectedSpeed -eq 0){
+   # Something paused the game: usually a milestone/unlock popup (a UI pause barrier) or the player.
+   if(!$nudged){ $nudged=$true; $null=Bridge set_simulation_speed @{speed=$Speed}; Start-Sleep -Seconds 3; if([double](Status).selectedSpeed -gt 0){continue} }
+   $held=$now; break
+  }
+ }
  $after=Status; $script:KeepPaused=$true
  $o=[ordered]@{before=$before;after=$after}
  Out-Result $o {
-  "ran $Seconds s at speed $Speed  ($($before.date) -> $($after.date)); game is still running."
+  if($held){"STOPPED EARLY: the game keeps pausing itself$(if($held.pause.popupHoldingPause){' - a game popup (usually a milestone or unlock) is open'}elseif($held.pause.gameWindowFocused -eq $false){' - the game window lost focus'}). A player must close the popup / return to the game; speed changes snap back to 0 until then. Nothing else is wrong."}
+  else{"ran $Seconds s at speed $Speed  ($($before.date) -> $($after.date)); game is still running."}
   "population $($before.population) -> $($after.population)   moving in: $($after.populationWithMoveIn)"
   "money      $([Math]::Round($before.money)) -> $([Math]::Round($after.money))  ($([Math]::Round($after.money-$before.money)))"
  }

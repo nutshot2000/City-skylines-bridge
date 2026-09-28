@@ -255,7 +255,10 @@ namespace CitiesIIAgentBridge
                     if(speed!=0 && (ConstructionAccess.Active!=null || (string)batch?["status"]=="running")) throw new InvalidOperationException("finish_construction_before_resuming");
                     float previous = simulation.selectedSpeed;
                     simulation.selectedSpeed = speed;
-                    return new JObject { ["previousSpeed"] = previous, ["selectedSpeed"] = simulation.selectedSpeed };
+                    var held = GamePauseReasons(world);
+                    var reply = new JObject { ["previousSpeed"] = previous, ["selectedSpeed"] = simulation.selectedSpeed };
+                    if (speed != 0 && (bool?)held?["popupHoldingPause"] == true) { reply["warning"] = "popup_holding_pause: a game dialog (usually a milestone popup) keeps the city paused; the player must close it. The speed will snap back to 0 until then."; reply["pause"] = held; }
+                    return reply;
                 }
                 default: throw new ArgumentException("unknown_command");
             }
@@ -279,6 +282,10 @@ namespace CitiesIIAgentBridge
                 ["date"] = time?.GetCurrentDateTime().ToString("O"),
                 ["controlEnabled"] = settings.AllowControl, ["stopLatched"] = File.Exists(Path.Combine(mailbox.Root, "STOP")), ["maxRequestBytes"] = 16384, ["citySession"] = citySession
             };
+            // 0.5.2: say WHY the city is paused. A milestone/unlock popup raises a UI "paused barrier"
+            // that snaps speed back to 0 until a player closes it; agents saw a frozen date and no reason.
+            var pause = GamePauseReasons(world);
+            if (pause != null) result["pause"] = pause;
             if (em.HasComponent<Population>(city.City))
             {
                 var population = em.GetComponentData<Population>(city.City);
@@ -288,6 +295,26 @@ namespace CitiesIIAgentBridge
                 result["averageHealth"] = population.m_AverageHealth;
             }
             return result;
+        }
+
+        private static JObject GamePauseReasons(World world)
+        {
+            try
+            {
+                var ui = world.GetExistingSystemManaged<Game.UI.InGame.TimeUISystem>();
+                if (ui == null) return null;
+                var barrierProp = typeof(Game.UI.InGame.TimeUISystem).GetProperty("pausedBarrierActive", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                bool barrier = barrierProp != null && (bool)barrierProp.GetValue(ui);
+                var focusField = typeof(Game.UI.InGame.TimeUISystem).GetField("m_HasFocus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                bool? focus = focusField == null ? (bool?)null : (bool)focusField.GetValue(ui);
+                return new JObject
+                {
+                    ["popupHoldingPause"] = barrier, ["gameWindowFocused"] = focus,
+                    ["meaning"] = barrier ? "A game dialog (often a milestone or unlock popup) is holding the simulation paused. Speed changes snap back to 0 until a player closes it." :
+                        focus == false ? "The game window is not focused; the game may pause itself when unfocused (game option)." : "No forced pause detected."
+                };
+            }
+            catch (Exception e) { return new JObject { ["unavailable"] = e.GetType().Name }; }
         }
 
         private static CameraController Camera()
