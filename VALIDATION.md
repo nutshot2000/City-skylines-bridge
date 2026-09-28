@@ -83,3 +83,14 @@ Verified loaded 0.4.9-coach.1 in Whinnitsburg with controls enabled. Saved check
 ## 0.5.0-coach.1 (2026-09-28)
 Helpers were live-tested on a new city (Klanka Canyon, game 1.3.6f1, DLL 0.4.9 loaded): from an empty map to 1,360 population and a positive budget. The utilities were one wind turbine, then five more; WaterTower01 and SewageOutlet01 were beside roads with **no pipes or cables**, and there were 0 shortages throughout. city.ps1 verbs exercised live: status, overview, map, roads, road, zone (including 6-tile industrial and 2-tile row-house zoning), place (turbines, landfill, clinics, cemetery, school), grow, find, zones, unlocks, buy, budget, tax, chirper. Offline: test-city 27, test-coach 31, test-client 27, building-report 10, connection-report 9, response-guide checks, and the mod suite including 14 new pause-policy checks, all passing.
 The 0.5.0 DLL compiles against the installed Game.dll. It is NOT yet live-tested: installing it needs the game saved and closed. After installing, verify that reads keep speed unchanged, and check `get_milestones`, zoning with a plain {x,z} start, `find_building_sites` tile filtering and `get_outside_connections` without a node.
+
+### 0.5.0 live test — 2026-09-28 (Klanka Canyon, pop 1,500 → 1,724)
+Installed 0.5.0-coach.1 with the previous DLL backed up; loaded fine, health/status report the version.
+- Reads do not pause: `problems`, `milestones`, `status` ran while the in-game date kept advancing at speed 1. Construction still pauses and city.ps1 restores the speed afterwards (verified after road/zone/place).
+- get_notifications: listed 12 live icons (Traffic Bottleneck ×10, Powerline Not Connected, Noise Pollution) with positions. Acting on it (east bypass + two west links to the z=1240 avenue) cut bottlenecks 10 → 8 → 2.
+- get_milestones: milestone 3 reached, 729/3500 XP to milestone 4, which unlocks Office Low; matches the locked office demand.
+- zone_rectangle with a plain {x,z} start (no block id): complete, 180 cells.
+- find_building_sites: reports lot size 128×200 m and rejections (38 overlapping, 15 outside owned tiles) with a next hint.
+- get_outside_connections without a node: status listed_only, 4 highway entry nodes.
+- get_build_prefabs unlockedBy: present on locked rows. PoliceStation01 had unlocked by then, so it showed an empty list.
+Found live and fixed in source (needs the next DLL install): traffic icons reported their lane ("Car Drive Lane 3") instead of the road; Notifications now walks lane → road edge. city.ps1 printed a false "left PAUSED" warning after reads on 0.5.0; it now checks the real speed first.

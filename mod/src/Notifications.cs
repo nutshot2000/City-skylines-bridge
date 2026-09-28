@@ -42,6 +42,9 @@ namespace CitiesIIAgentBridge
                     if (em.HasComponent<Game.Common.Owner>(e))
                     {
                         var owner = em.GetComponentData<Game.Common.Owner>(e).m_Owner;
+                        // Traffic icons sit on a lane; walk up to the road edge/building that owns it.
+                        for (int hop = 0; hop < 4 && em.Exists(owner) && !em.HasComponent<Game.Buildings.Building>(owner) && !em.HasComponent<Game.Net.Edge>(owner) && !em.HasComponent<Game.Net.Node>(owner) && em.HasComponent<Game.Common.Owner>(owner); hop++)
+                            owner = em.GetComponentData<Game.Common.Owner>(owner).m_Owner;
                         if (em.Exists(owner))
                         {
                             var target = NativeBuild.Id(owner);

@@ -526,6 +526,8 @@ try {
  $script:failed=$true
 } finally {
  # Bridge reads pause the city. Put the clock back unless the caller chose a speed.
+ # DLL 0.5.0+ only pauses for construction; check the real speed so we never 'restore' needlessly.
+ if($script:PausedByUs -and !$KeepPaused -and $restore -gt 0){ try { if([double](Status).selectedSpeed -gt 0){$script:PausedByUs=$false} } catch {} }
  if($script:PausedByUs -and !$KeepPaused -and $restore -gt 0){
   $why=''
   for($try=0;$try -lt 3;$try++){
