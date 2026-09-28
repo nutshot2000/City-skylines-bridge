@@ -21,7 +21,7 @@ param(
  [double]$Rotation=[double]::NaN, [int]$MaxCost=0, [int]$Reserve=50000,
  [int]$Seconds=60, [int]$Rate=-999, [int]$Speed=2, [int]$Limit=40, [double]$Step=100,
  [string]$Region='', [string]$Filter='', [string]$ArgsJson='{}',
- [switch]$Preview, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
+ [switch]$Preview, [switch]$AllowWater, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
 $Kit=$PSScriptRoot
@@ -54,6 +54,7 @@ function Explain([string]$Command,[string]$Err,$Result=$null) {
   'start_requires_zone_block' {'Zoning needs a road nearby: zone cells only exist within ~48 m of a road.';break}
   'no_zone_cells_in_rectangle' {'The rectangle contains no zone cells. Zone cells only exist along roads.';break}
   'game_rejected_placement' {'The game refused this spot. Reasons: ' + ((@($Result.placementErrors.nativeReasons.type)|Sort-Object -Unique) -join ', ') + '. OverlapExisting = hits a road/building; InWater = too far into water; move a few metres or let place pick a site.';break}
+  'batch_step_failed' { $i=[int]$Result.failureIndex; $s=@($Result.results)[$i]; $why=((@($s.placementErrors.nativeReasons.type)|Where-Object {$_}|Sort-Object -Unique) -join ', '); "Segment $($i+1) failed: $($s.error)$(if($why){" ($why)"}). Earlier segments WERE built - do not resend them. OverlapExisting on a road usually means it crosses another road at a different height (bridge) or runs along one.";break}
   'budget|insufficient|money' {'Not enough money or maxCost too low. Raise -MaxCost or check city.ps1 status.';break}
   'batch_in_progress' {'A batch is still running. Wait, then run city.ps1 status.';break}
   'no_loaded_city' {'No city is loaded. Ask the player to load a save.';break}
@@ -156,6 +157,7 @@ $Help=[ordered]@{
  map       = "map [-At x,z] [-Radius 600] [-Step 100]  - ASCII terrain: # land, ~ shallow water, W deep water, R road."
  roads     = "roads [-At x,z] [-Radius 400]  - roads near a point: id, type, endpoints."
  road      = "road -Path 'x,z' 'x,z' ... [-Type small|medium|large|<exact name>]  - build a road through the points (long legs auto-split)."
+ upgrade   = "upgrade -Path 'x,z' ... -Type large  - upgrade the road segment nearest each point (e.g. a jammed road to Large Road)."
  zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Region NA|EU]  - paint zoning in a rectangle along roads."
  place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
@@ -303,6 +305,12 @@ function Do-Road {
  if($From -and $To){$pts=@((ParsePoint $From '-From'),(ParsePoint $To '-To'))}
  if($pts.Count -lt 2){throw "Give at least two points: city.ps1 road -Path '0,1000' '0,1400' -Type small"}
  $p=Resolve-Road $(if($Type){$Type}elseif($Name){$Name}else{'small'})
+ # Roads over water become costly bridges/quays; stop unless the caller really wants that.
+ if(!$AllowWater){
+  $probe=@(); foreach($leg in Split-Legs $pts){ $n=[Math]::Max(2,[Math]::Ceiling((Dist $leg.start $leg.end)/25)); for($k=0;$k -le $n;$k++){ $probe+=@{x=$leg.start.x+($leg.end.x-$leg.start.x)*$k/$n;z=$leg.start.z+($leg.end.z-$leg.start.z)*$k/$n} } }
+  $wet=@((Bridge sample_terrain @{points=@($probe|Select-Object -First 1024)}).samples|Where-Object {$_.waterDepth -gt 0.5})
+  if($wet.Count){ $w=$wet[0]; throw "This road would cross water (e.g. $([Math]::Round($wet.Count*25)) m of it; $([Math]::Round($w.waterDepth,1)) m deep at ($([Math]::Round($w.position.x)),$([Math]::Round($w.position.z)))). The game would build a costly bridge. Shorten it (city.ps1 map shows water as ~/W), or add -AllowWater if you really want a bridge." }
+ }
  $steps=@(Split-Legs $pts|ForEach-Object {@{command='build_road';args=@{prefabIndex=$p.index;prefabVersion=$p.version;maxCost=$(if($MaxCost){$MaxCost}else{200000});start=$_.start;end=$_.end}}})
  $r=Bridge batch_execute @{reserve=$Reserve;steps=$steps} 60
  Out-Result $r {
@@ -311,6 +319,26 @@ function Do-Road {
   'Zone along it with: city.ps1 zone -Type residential -From x,z -To x,z'
  }
 }
+
+function Do-Upgrade {
+ $pts=@($Path+$Rest+$(if($At){$At})|Where-Object {$_}|ForEach-Object {ParsePoint $_ 'point'})
+ if(!$pts.Count){throw "upgrade -Path 'x,z' ['x,z' ...] -Type large   (one point on each road segment to upgrade)"}
+ $p=Resolve-Road $(if($Type){$Type}elseif($Name){$Name}else{throw 'upgrade needs -Type, e.g. -Type large'})
+ $done=@(); $out=@()
+ foreach($pt in $pts){
+  $edges=@((Bridge get_network_edges @{x=$pt.x;z=$pt.z;radius=80}).edges|Where-Object {$_.prefab -notmatch 'Pipe|Cable|Voltage|Line|Highway'})
+  $best=$null;$bd=[double]::MaxValue
+  foreach($e in $edges){ $d=SegDist $pt $e.start $e.end; if($d -lt $bd){$bd=$d;$best=$e} }
+  if(!$best -or $bd -gt 30){$out+="  ($($pt.x),$($pt.z)): no road within 30 m"; continue}
+  $key="$($best.index):$($best.version)"; if($done -contains $key){continue}; $done+=$key
+  if($best.prefab -eq $p.name){$out+="  ($($pt.x),$($pt.z)): already $($p.name)"; continue}
+  try { $r=Bridge upgrade_network @{index=$best.index;version=$best.version;prefabIndex=$p.index;prefabVersion=$p.version;maxCost=$(if($MaxCost){$MaxCost}else{200000})} 60
+        $out+="  ($($pt.x),$($pt.z)): $($best.prefab) -> $($p.name) $(if($r.previewCost){"cost $($r.previewCost)"})" }
+  catch { $out+="  ($($pt.x),$($pt.z)): FAILED $((($_.Exception.Message) -split "`n")[0])" }
+ }
+ Out-Result $out { "upgrade to $($p.name):"; $out }
+}
+function SegDist($p,$a,$b){ $dx=$b.x-$a.x;$dz=$b.z-$a.z;$l2=$dx*$dx+$dz*$dz; $t=if($l2 -gt 0){[Math]::Max(0.0,[Math]::Min(1.0,[double]((($p.x-$a.x)*$dx+($p.z-$a.z)*$dz)/$l2)))}else{0.0}; [Math]::Sqrt([Math]::Pow($p.x-($a.x+$t*$dx),2)+[Math]::Pow($p.z-($a.z+$t*$dz),2)) }
 
 function Do-Zone {
  $z=Resolve-Zone $(if($Type){$Type}elseif($Name){$Name}else{throw 'zone needs -Type, e.g. -Type residential'})
@@ -394,6 +422,20 @@ function Do-Unlocks {
  Out-Result $d {
   "development points: $($d.developmentPoints)   city XP: $($d.cityXp)"
   $nodes=@($d.nodes)
+  if($Filter){
+   # Show the prerequisite chain for matching nodes, e.g. unlocks -Filter LargeRoads
+   $byId=@{}; foreach($n in $nodes){$byId["$($n.index):$($n.version)"]=$n}
+   foreach($n in @($nodes|Where-Object {$_.name -match $Filter})){
+    "$($n.name): cost $($n.cost), $(if(!$n.locked){'OWNED'}elseif($n.purchasable){'BUY NOW (city.ps1 buy '+$n.name+')'}else{"blocked: $($n.blocker)"})"
+    $seen=@{}; $queue=[System.Collections.Generic.Queue[object]]::new(); $queue.Enqueue(@($n,1))
+    while($queue.Count){ $item=$queue.Dequeue(); $cur=$item[0]; $depth=$item[1]
+     foreach($req in @($cur.requirements)){ $k="$($req.index):$($req.version)"; if($seen[$k]){continue}; $seen[$k]=1; $r=$byId[$k]; if(!$r){continue}
+      "$('  '*$depth)needs $($r.name) (cost $($r.cost), $(if(!$r.locked){'owned'}elseif($r.purchasable){'buy now'}else{$r.blocker}))"
+      if($r.locked){$queue.Enqueue(@($r,$depth+1))} } }
+    if(@($n.requirements).Count -gt 1 -and $n.requirementRule -match 'any'){"  (any ONE of these prerequisites is enough)"}
+   }
+   return
+  }
   $ok=@($nodes|Where-Object {$_.eligible -eq $true -or $_.purchasable -eq $true})
   if($ok.Count){'can buy now:'; $ok|Select-Object -First $Limit|ForEach-Object {"  {0,-10} {1} (cost {2})" -f "$($_.index):$($_.version)",$_.name,$_.cost}}
   else{"$($nodes.Count) nodes; none purchasable right now."}
@@ -422,7 +464,7 @@ function Do-Buy {
 }
 # Plain-English fixes for the in-game warning icons (notification prefab names vary; match loosely).
 $IconAdvice=[ordered]@{
- 'Traffic|Jam'='upgrade the busy road to Medium/Large (raw upgrade_network), add a parallel route, or spread shops/jobs out'
+ 'Traffic|Jam'='add a parallel route/second link to the highway, or widen it: city.ps1 upgrade -Path x,z -Type large'
  'Electric|Power'='add generation or connect this area to a powered road'
  'Water|Pipe'='add water capacity or connect this area to a road reached by your water source'
  'Sewage'='add sewage outlet/treatment capacity or connect the area'
@@ -431,8 +473,8 @@ $IconAdvice=[ordered]@{
  'Customer'='zone more housing / lower commercial zoning here'
  'Road|Access'='connect this building to the road network'
  'Abandon'='fix the cause (utilities, taxes, demand) or demolish'
- 'Crime'='police (unlocks with milestones)'
- 'Fire|Burn'='fire station (unlocks with milestones)'
+ 'Crime'='place a police station nearby (city.ps1 find police)'
+ 'Fire|Burn'='place a fire station nearby (city.ps1 find fire)'
  'Sick|Health|Hospital'='more clinics/hospitals'
  'Dead|Death|Hearse'='cemetery or crematorium capacity'
  'Pollution|Noise'='move industry/generators away from homes, add parks'
@@ -493,7 +535,7 @@ function Do-Overview {
  if($lock.Count){$next.Add("Demand for $($lock -join ' and ') is LOCKED: keep growing to the next milestone (city.ps1 status shows XP). Low-density zoning still grows XP.")}
  if([double]$d.budget.balanceRaw -lt 0){$next.Add("Budget negative ($($d.budget.balanceRaw)/month): grow population, raise taxes a little, or trim service budgets.")}
  $top=@($pen|Group-Object factor|Sort-Object Count -Descending|Select-Object -First 4)
- foreach($t in $top){ if($t.Name -eq 'NotEnoughEmployees'){$next.Add("$($t.Count) businesses lack workers: zone more housing.")} elseif($t.Name -eq 'WindSpeed'){} else {$next.Add("$($t.Count) buildings penalised by $($t.Name).")} }
+ foreach($t in $top){ if($t.Name -eq 'NotEnoughEmployees'){ if((@($d.demand.residential)|Measure-Object -Maximum).Maximum -gt 30){$next.Add("$($t.Count) businesses lack workers: zone more housing.")}else{$next.Add("$($t.Count) businesses lack workers, but housing demand is low: residents are still moving in ($([int]$c.populationWithMoveIn-[int]$c.population)) or commutes are too long. Keep growing; avoid zoning more jobs for now.")} } elseif($t.Name -eq 'WindSpeed'){} else {$next.Add("$($t.Count) buildings penalised by $($t.Name).")} }
  try { $icons=Bridge get_notifications @{examples=1}; foreach($g in @($icons.types)|Select-Object -First 4){ $ex=@($g.examples)[0]; $next.Add("$($g.count) '$($g.type)' warning icon(s), e.g. at ($([Math]::Round($ex.position.x)),$([Math]::Round($ex.position.z))). $(Advice $g.type)  (city.ps1 problems)") } } catch {}
  if(!$next.Count){$next.Add('No urgent problems. Grow (city.ps1 grow), then expand roads + zoning as demand rises.')}
  $o=[ordered]@{city=$c;demand=$d.demand;budget=$d.budget;utilities=$u;shortages=$groups|ForEach-Object {@{type=$_.Name;count=$_.Count}};penalties=$top|ForEach-Object {@{factor=$_.Name;count=$_.Count}};buildings=$d.buildingCount;underConstruction=$d.underConstruction;next=$next}
@@ -516,7 +558,7 @@ try {
  if($Verb -ne 'help'){ try { $restore=[double](Status).selectedSpeed } catch { if($_.Exception.Message -match 'heartbeat'){throw (Explain 'status' $_.Exception.Message)}; throw } }
  switch($Verb){
   'help'{Do-Help} 'status'{Do-Status} 'overview'{Do-Overview} 'speed'{Do-Speed} 'grow'{Do-Grow} 'find'{Do-Find}
-  'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'zone'{Do-Zone} 'place'{Do-Place}
+  'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'upgrade'{Do-Upgrade} 'zone'{Do-Zone} 'place'{Do-Place}
   'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
   'tax'{Do-Tax} 'problems'{Do-Problems} 'buy'{Do-Buy} 'milestones'{Do-Milestones} 'chirper'{Do-Chirper} 'save'{Do-Save} 'raw'{Do-Raw}
   default {throw "Unknown verb '$Verb'. Run: city.ps1 help"}

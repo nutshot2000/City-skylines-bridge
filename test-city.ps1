@@ -55,6 +55,7 @@ function Bridge([string]$Command,$Arguments=@{},[int]$Wait=60){
   'place_building' {
     if($Arguments.previewOnly -and $Arguments.position.x -eq 10){throw 'place_building failed: game_rejected_placement'+"`n"+'  HINT: The game refused this spot. Reasons: OverlapExisting. OverlapExisting = ...'}
     return [pscustomobject]@{status='complete';previewCost=25000;createdBuildings=@([pscustomobject]@{index=77;version=2})} }
+  'sample_terrain' { return [pscustomobject]@{samples=@(@($Arguments.points)|ForEach-Object {[pscustomobject]@{position=[pscustomobject]@{x=$_.x;y=380;z=$_.z};waterDepth=$(if($_.z -gt 5000){12}else{0})}})} }
   'batch_execute' { return [pscustomobject]@{status='complete';steps=@($Arguments.steps).Count;completed=@($Arguments.steps).Count;moneySpent=100} }
   default { throw "unexpected command $Command" }
  }
@@ -91,5 +92,10 @@ $script:Sent.Clear(); $Type='small'; $Path=@('355,1240','-700,1240'); $Rest=@();
 $null=Do-Road
 $batch=@($script:Sent|Where-Object command -eq 'batch_execute')
 Check ($batch.Count -eq 1 -and @($batch[0].args.steps).Count -eq 2) 'road sends a single batch with the split legs'
+$script:Sent.Clear(); $Path=@('0,4900','0,5200')
+Check (Throws {Do-Road} 'cross water') 'road over water is refused before building'
+Check (@($script:Sent|Where-Object command -eq 'batch_execute').Count -eq 0) 'nothing is built when water is found'
+$AllowWater=$true; $null=Do-Road; $AllowWater=$false
+Check (@($script:Sent|Where-Object command -eq 'batch_execute').Count -eq 1) '-AllowWater builds the bridge anyway'
 
 "$passed city.ps1 checks passed. No game commands sent."
