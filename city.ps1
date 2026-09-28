@@ -163,6 +163,7 @@ $Help=[ordered]@{
  place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000)."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
  buildings = "buildings [-Filter text] [-Problems] [-At x,z -Radius 300]  - list your buildings (id, name, position, issues)."
+ cleanup   = "cleanup [-Filter Destroyed]  - bulldoze buildings the game flags as destroyed/collapsed/abandoned (after tornadoes, fires, abandonment) so the lots regrow."
  inspect   = "inspect -Id index:version  - details of one building/road/node."
  demolish  = "demolish -Id index:version  - bulldoze one building or road segment you own."
  unlocks   = "unlocks [-Type Electricity] [-Filter NodeName]  - development points; nodes you can buy now, one tree branch, or the prerequisite chain of a node."
@@ -386,6 +387,22 @@ function Do-Link {
   $r=[pscustomobject]@{previewCost=$b2.moneySpent}
  } else { try { $r=Bridge build_network $req } catch { throw "$($_.Exception.Message)`n  The straight line from ($([Math]::Round($best[0].position.x)),$([Math]::Round($best[0].position.z))) to ($([Math]::Round($best[1].position.x)),$([Math]::Round($best[1].position.z))) is blocked. Add waypoints around the obstacle: -Path 'x,z' 'x,z'" } }
  Out-Result $r {"$net built between $From and $To ($([Math]::Round($bd)) m direct, cost $($r.previewCost)). Check city.ps1 problems: the 'not connected' icon should clear within a minute of game time."}
+}
+
+function Do-Cleanup {
+ # After a disaster or abandonment: bulldoze every building carrying a destroyed/collapsed/abandoned icon
+ # so its zoned lot can regrow. Only acts on buildings the game itself has flagged.
+ $pattern=if($Filter){$Filter}else{'Destroyed|Collapsed|Abandon'}
+ $r=Bridge get_notifications @{filter='';examples=50}
+ $ids=@($r.types|Where-Object {$_ -and $_.type -match $pattern}|ForEach-Object {@($_.examples)}|Where-Object {$_.on.kind -eq 'building'}|ForEach-Object {"$($_.on.index):$($_.on.version)"}|Sort-Object -Unique)
+ $total=(@($r.types|Where-Object {$_ -and $_.type -match $pattern})|Measure-Object count -Sum).Sum
+ if(!$ids.Count){Out-Result @{cleared=0} {"no buildings flagged as $pattern"}; return}
+ $steps=@($ids|ForEach-Object {$i=Parse-Id $_; @{command='demolish';args=@{index=$i.index;version=$i.version}}})
+ $b=Bridge batch_execute @{reserve=0;steps=$steps} 60
+ Out-Result $b {
+  "cleared $($b.completed) of $($ids.Count) flagged buildings ($pattern)$(if($total -gt $ids.Count){"; $($total-$ids.Count) more flagged - run cleanup again"}). Their zoned lots will regrow while the game runs."
+  if($b.status -ne 'complete'){"stopped at $([int]$b.failureIndex+1): $($b.error)"}
+ }
 }
 
 function Do-Zone {
@@ -659,7 +676,7 @@ try {
  switch($Verb){
   'help'{Do-Help} 'status'{Do-Status} 'overview'{Do-Overview} 'speed'{Do-Speed} 'grow'{Do-Grow} 'find'{Do-Find}
   'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'upgrade'{Do-Upgrade} 'link'{Do-Link} 'zone'{Do-Zone} 'place'{Do-Place}
-  'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
+  'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'cleanup'{Do-Cleanup} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
   'land'{Do-Land} 'buyland'{Do-BuyLand} 'tax'{Do-Tax} 'problems'{Do-Problems} 'buy'{Do-Buy} 'milestones'{Do-Milestones} 'chirper'{Do-Chirper} 'save'{Do-Save} 'raw'{Do-Raw}
   default {throw "Unknown verb '$Verb'. Run: city.ps1 help"}
  }

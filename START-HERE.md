@@ -33,6 +33,7 @@ This is the sequence that built Klanka Canyon, from an empty map to 1,000+ resid
 ./city.ps1 grow -Seconds 120 -Speed 4                               # let it grow
 ./city.ps1 overview                                                 # what does the city need next?
 ./city.ps1 problems                                                 # the warning icons flashing in-game (traffic jams, no water...)
+./city.ps1 cleanup                                                  # after a tornado/fire: clear destroyed and abandoned buildings so lots regrow
 ```
 
 After that, repeat: `overview` → do the top item in NEXT → `grow` → `overview`.
