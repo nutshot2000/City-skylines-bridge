@@ -546,7 +546,7 @@ function Do-Buy {
 $IconAdvice=[ordered]@{
  'Accident'='usually clears by itself (emergency services tow it); if it keeps happening, simplify that junction'
  'Traffic|Jam'='add a parallel route/second link to the highway, or widen it: city.ps1 upgrade -Path x,z -Type large'
- 'Powerline Not Connected'='a power plant''s high-voltage output is not wired: place TransformerStation01 beside it and run city.ps1 link -From <plant id> -To <transformer id> (a lone map power line can be ignored)'
+ 'Powerline Not Connected'='on a power plant: place TransformerStation01 beside it and run city.ps1 link -From <plant> -To <transformer>. On the map''s own pylons (an outside connection): place TransformerStation01 right beside the end pylon - it snaps on, and you can then sell surplus power / import when short'
  'Electric|Power'='add generation or connect this area to a powered road'
  'Water|Pipe'='add water capacity or connect this area to a road reached by your water source'
  'Sewage'='add sewage outlet/treatment capacity or connect the area'
