@@ -158,7 +158,7 @@ $Help=[ordered]@{
  roads     = "roads [-At x,z] [-Radius 400]  - roads near a point: id, type, endpoints."
  road      = "road -Path 'x,z' 'x,z' ... [-Type small|medium|large|<exact name>]  - build a road through the points (long legs auto-split)."
  upgrade   = "upgrade -Path 'x,z' ... -Type large  - upgrade the road segment nearest each point (e.g. a jammed road to Large Road)."
- link      = "link -From index:version -To index:version [-Type hv|lv|water|sewage]  - wire a power plant's high-voltage output to a TransformerStation01 (roads only carry low voltage)."
+ link      = "link -From index:version -To index:version [-Type hv|lv|water|sewage] [-Path 'x,z' ...]  - wire a power plant's high-voltage output to a TransformerStation01 (roads only carry low voltage)."
  zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Region NA|EU]  - paint zoning in a rectangle along roads."
  place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000)."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
@@ -377,8 +377,15 @@ function Do-Link {
  $req=@{prefabIndex=$p.index;prefabVersion=$p.version;maxCost=$(if($MaxCost){$MaxCost}else{100000});elevation=0
   start=@{index=$best[0].index;version=$best[0].version;x=$best[0].position.x;z=$best[0].position.z}
   end=@{index=$best[1].index;version=$best[1].version;x=$best[1].position.x;z=$best[1].position.z}}
- $r=Bridge build_network $req
- Out-Result $r {"$net built between $From and $To ($([Math]::Round($bd)) m, cost $($r.previewCost)). Check city.ps1 problems: the 'not connected' icon should clear within a minute of game time."}
+ $via=@($Path|Where-Object {$_}|ForEach-Object {ParsePoint $_ 'waypoint'})
+ if($via.Count){
+  # Detour around buildings/roads: node -> waypoints -> node, one leg per segment.
+  $pts=@($req.start)+$via+@($req.end); $steps=@()
+  for($i=0;$i -lt $pts.Count-1;$i++){ $steps+=@{command='build_network';args=@{prefabIndex=$p.index;prefabVersion=$p.version;maxCost=$req.maxCost;elevation=0;start=$pts[$i];end=$pts[$i+1]}} }
+  $b2=Bridge batch_execute @{reserve=$Reserve;steps=$steps} 60
+  $r=[pscustomobject]@{previewCost=$b2.moneySpent}
+ } else { try { $r=Bridge build_network $req } catch { throw "$($_.Exception.Message)`n  The straight line from ($([Math]::Round($best[0].position.x)),$([Math]::Round($best[0].position.z))) to ($([Math]::Round($best[1].position.x)),$([Math]::Round($best[1].position.z))) is blocked. Add waypoints around the obstacle: -Path 'x,z' 'x,z'" } }
+ Out-Result $r {"$net built between $From and $To ($([Math]::Round($bd)) m direct, cost $($r.previewCost)). Check city.ps1 problems: the 'not connected' icon should clear within a minute of game time."}
 }
 
 function Do-Zone {
