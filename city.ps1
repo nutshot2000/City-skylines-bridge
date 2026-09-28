@@ -158,6 +158,7 @@ $Help=[ordered]@{
  roads     = "roads [-At x,z] [-Radius 400]  - roads near a point: id, type, endpoints."
  road      = "road -Path 'x,z' 'x,z' ... [-Type small|medium|large|<exact name>]  - build a road through the points (long legs auto-split)."
  upgrade   = "upgrade -Path 'x,z' ... -Type large  - upgrade the road segment nearest each point (e.g. a jammed road to Large Road)."
+ link      = "link -From index:version -To index:version [-Type hv|lv|water|sewage]  - wire a power plant's high-voltage output to a TransformerStation01 (roads only carry low voltage)."
  zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Region NA|EU]  - paint zoning in a rectangle along roads."
  place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000)."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
@@ -361,6 +362,25 @@ function Do-Upgrade {
 function SegCross($a,$b,$c,$d){ $o={param($p,$q,$r) ($q.x-$p.x)*($r.z-$p.z)-($q.z-$p.z)*($r.x-$p.x)}; $d1=& $o $c $d $a; $d2=& $o $c $d $b; $d3=& $o $a $b $c; $d4=& $o $a $b $d; return (($d1 -gt 0) -ne ($d2 -gt 0)) -and (($d3 -gt 0) -ne ($d4 -gt 0)) -and [Math]::Abs($d1) -gt 1 -and [Math]::Abs($d2) -gt 1 }
 function SegDist($p,$a,$b){ $dx=$b.x-$a.x;$dz=$b.z-$a.z;$l2=$dx*$dx+$dz*$dz; $t=if($l2 -gt 0){[Math]::Max(0.0,[Math]::Min(1.0,[double]((($p.x-$a.x)*$dx+($p.z-$a.z)*$dz)/$l2)))}else{0.0}; [Math]::Sqrt([Math]::Pow($p.x-($a.x+$t*$dx),2)+[Math]::Pow($p.z-($a.z+$t*$dz),2)) }
 
+function Do-Link {
+ # Wire two buildings together through their free utility connector nodes, e.g. a coal plant's
+ # high-voltage output to a transformer. Road-side buildings need no links: roads carry LV power/water/sewage.
+ $a=Parse-Id $From; $b=Parse-Id $To
+ $kind=if($Type){$Type}else{'hv'}
+ $net=switch -regex ($kind){ '^(hv|high)' {'High-voltage Line';break} '^(lv|low)' {'Low-voltage Line';break} '^water' {'Small Water Pipe';break} '^sewage' {'Small Sewage Pipe';break} default {$kind} }
+ $p=Resolve-Prefab $net 'network'
+ $free={param($id) @((Bridge get_utility_connectors $id).candidates|Where-Object {@($_.incidentEdges).Count -eq 0})}
+ $na=@(& $free $a); $nb=@(& $free $b)
+ if(!$na.Count -or !$nb.Count){throw "No free connector on $(if(!$na.Count){$From}else{$To}). It may already be linked (check city.ps1 problems), or this building has no $net connector."}
+ $best=$null;$bd=[double]::MaxValue; foreach($x in $na){foreach($y in $nb){$d=Dist $x.position $y.position; if($d -lt $bd){$bd=$d;$best=@($x,$y)}}}
+ if($bd -gt 1000){throw "Connectors are $([Math]::Round($bd)) m apart; place the buildings closer (max 1000 m per line)."}
+ $req=@{prefabIndex=$p.index;prefabVersion=$p.version;maxCost=$(if($MaxCost){$MaxCost}else{100000});elevation=0
+  start=@{index=$best[0].index;version=$best[0].version;x=$best[0].position.x;z=$best[0].position.z}
+  end=@{index=$best[1].index;version=$best[1].version;x=$best[1].position.x;z=$best[1].position.z}}
+ $r=Bridge build_network $req
+ Out-Result $r {"$net built between $From and $To ($([Math]::Round($bd)) m, cost $($r.previewCost)). Check city.ps1 problems: the 'not connected' icon should clear within a minute of game time."}
+}
+
 function Do-Zone {
  $z=Resolve-Zone $(if($Type){$Type}elseif($Name){$Name}else{throw 'zone needs -Type, e.g. -Type residential'})
  if(!$From -or !$To){throw 'zone needs -From x,z -To x,z (opposite corners of the rectangle).'}
@@ -501,6 +521,7 @@ function Do-Buy {
 $IconAdvice=[ordered]@{
  'Accident'='usually clears by itself (emergency services tow it); if it keeps happening, simplify that junction'
  'Traffic|Jam'='add a parallel route/second link to the highway, or widen it: city.ps1 upgrade -Path x,z -Type large'
+ 'Powerline Not Connected'='a power plant''s high-voltage output is not wired: place TransformerStation01 beside it and run city.ps1 link -From <plant id> -To <transformer id> (a lone map power line can be ignored)'
  'Electric|Power'='add generation or connect this area to a powered road'
  'Water|Pipe'='add water capacity or connect this area to a road reached by your water source'
  'Sewage'='add sewage outlet/treatment capacity or connect the area'
@@ -630,7 +651,7 @@ try {
  if($Verb -ne 'help'){ try { $restore=[double](Status).selectedSpeed } catch { if($_.Exception.Message -match 'heartbeat'){throw (Explain 'status' $_.Exception.Message)}; throw } }
  switch($Verb){
   'help'{Do-Help} 'status'{Do-Status} 'overview'{Do-Overview} 'speed'{Do-Speed} 'grow'{Do-Grow} 'find'{Do-Find}
-  'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'upgrade'{Do-Upgrade} 'zone'{Do-Zone} 'place'{Do-Place}
+  'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'upgrade'{Do-Upgrade} 'link'{Do-Link} 'zone'{Do-Zone} 'place'{Do-Place}
   'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
   'land'{Do-Land} 'buyland'{Do-BuyLand} 'tax'{Do-Tax} 'problems'{Do-Problems} 'buy'{Do-Buy} 'milestones'{Do-Milestones} 'chirper'{Do-Chirper} 'save'{Do-Save} 'raw'{Do-Raw}
   default {throw "Unknown verb '$Verb'. Run: city.ps1 help"}

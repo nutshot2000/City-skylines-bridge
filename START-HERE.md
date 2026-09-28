@@ -39,7 +39,7 @@ After that, repeat: `overview` → do the top item in NEXT → `grow` → `overv
 
 ## Rules that save you hours
 
-1. **Roads carry power, water and sewage.** A generator, water source and sewage outlet placed beside roads that connect to your streets supply every building on that road network. You do **not** need to lay pipes or cables along streets. Only lay them (`road -Type power|water|sewage`) to reach something that isn't beside a connected road.
+1. **Roads carry power, water and sewage.** (Exception: big power plants such as SmallCoalPowerPlant01 output HIGH voltage. Place a `TransformerStation01` beside the plant and run `city.ps1 link -From <plant> -To <transformer>`. Keep the plant ~30 m inside your land edge so the line's pylons fit. Wind turbines need nothing extra.) A generator, water source and sewage outlet placed beside roads that connect to your streets supply every building on that road network. You do **not** need to lay pipes or cables along streets. Only lay them (`road -Type power|water|sewage`) to reach something that isn't beside a connected road.
 2. **Zone, don't place, houses and shops.** Zoning is free. Buildings grow by themselves while the game runs. `place` is for services and utilities only.
 3. **Zone cells only exist within ~48 m of a road.** Space parallel streets about 100 m apart so both sides get full-depth lots. `zone` splits big rectangles for you.
 4. **Reserve land for services before you zone.** A clinic needs about 88×48 m, a school more, and a cemetery 128×200 m. Once houses fill the road-sides, `place` has nowhere to go. Leave one block unzoned per district, or run a short dead-end road into empty land (`road`, then `place` beside it).
