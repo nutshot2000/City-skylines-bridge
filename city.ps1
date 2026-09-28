@@ -21,7 +21,7 @@ param(
  [double]$Rotation=[double]::NaN, [int]$MaxCost=0, [int]$Reserve=50000,
  [int]$Seconds=60, [int]$Rate=-999, [int]$Speed=2, [int]$Limit=40, [double]$Step=100,
  [string]$Region='', [string]$Filter='', [string]$ArgsJson='{}',
- [switch]$Preview, [switch]$Replace, [switch]$AllowWater, [switch]$AllowHighway, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
+ [switch]$Preview, [switch]$Replace, [switch]$Clear, [switch]$AllowWater, [switch]$AllowHighway, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
 $Kit=$PSScriptRoot
@@ -150,6 +150,7 @@ function Resolve-Zone([string]$Text) {
 $Help=[ordered]@{
  help      = "help [verb]  - this list, or details for one verb."
  status    = "status  - money, population, date, speed, tool state. Never pauses the game."
+ happiness = "happiness  - what makes citizens happy or unhappy (crime, entertainment, pollution, taxes...) with what to build."
  overview  = "overview  - one-screen city report: demand, budget, utilities, shortages, problems, what to do next."
  speed     = "speed <0|1|2|4>  - set game speed (0 = pause)."
  grow      = "grow [-Seconds 60] [-Speed 2]  - let the city run, then report population/money change."
@@ -161,7 +162,7 @@ $Help=[ordered]@{
  upgrade   = "upgrade -Path 'x,z' ... -Type large  - upgrade the road segment nearest each point (e.g. a jammed road to Large Road)."
  link      = "link -From index:version -To index:version [-Type hv|lv|water|sewage] [-Path 'x,z' ...]  - wire a power plant's high-voltage output to a TransformerStation01 (roads only carry low voltage)."
  zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Replace] [-Region NA|EU]  - paint zoning in a rectangle along roads. Existing zoning is kept unless -Replace (buildings already standing stay until demolished)."
- place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000)."
+ place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000). -Clear bulldozes buildings in the way (e.g. a park in a full district)."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
  buildings = "buildings [-Filter text] [-Problems] [-At x,z -Radius 300]  - list your buildings (id, name, position, issues)."
  powerlink = "powerlink  - connect the map's own pylons (outside power line) to your city with a transformer: import power before you have generators, sell surplus later. Do this early."
@@ -407,6 +408,22 @@ function Do-PowerLink {
  Out-Result $out { $out; 'Check with: city.ps1 problems -Filter Powerline (should be empty) and city.ps1 budget (ExportElectricity/ImportElectricity).' }
 }
 
+$HappyAdvice=@{
+ Crime='more police stations spread across districts (city.ps1 find police)'; Entertainment='parks, plazas and leisure buildings in every district (city.ps1 find park)'
+ Leisure='parks and recreation'; AirPollution='keep industry/coal 500 m+ from homes; add wind power'; NoisePollution='pocket parks; keep homes off big roads and industry'
+ TrafficPenalty='widen jammed roads, add routes (city.ps1 problems -Filter Traffic)'; Tax='lower that tax a little (city.ps1 tax)'; Garbage='more landfill/garbage capacity'
+ Unemployment='zone jobs (commercial/industry/office) near housing'; Healthcare='clinics/hospital'; Education='schools'; Telecom='telecom tower'; Mail='post office'
+ Water='water supply'; Sewage='sewage capacity'; Electricity='power supply'; Homelessness='zone more housing'
+}
+function Do-Happiness {
+ $d=Bridge get_city_diagnostics
+ $rows=@($d.happinessFactors.PSObject.Properties|Where-Object {!$_.Value.locked -and [Math]::Abs([double]$_.Value.effect) -ge 0.05}|Sort-Object {[double]$_.Value.effect})
+ Out-Result $rows {
+  "average happiness $($d.city.averageHappiness), health $($d.city.averageHealth). Factors pulling it down first:"
+  foreach($r in $rows){ $e=[double]$r.Value.effect; "  {0,-16} {1,6:N1}  {2}" -f $r.Name,$e,$(if($e -lt 0 -and $HappyAdvice[$r.Name]){"-> $($HappyAdvice[$r.Name])"}) }
+ }
+}
+
 function Do-Cleanup {
  # After a disaster or abandonment: bulldoze every building carrying a destroyed/collapsed/abandoned icon
  # so its zoned lot can regrow. Only acts on buildings the game itself has flagged.
@@ -471,11 +488,23 @@ function Do-Place {
    if($owned.Count -and !(InOwned $s.position $owned)){$outside++;continue}
    if($tries.Count -lt 16){$tries+=[ordered]@{position=[ordered]@{x=[Math]::Round($s.position.x,2);z=[Math]::Round($s.position.z,2)};rotation=[Math]::Round($s.rotation,1)}}
   }
-  if(!$tries.Count){$lot=(Bridge get_prefab_details @{index=$p.index;version=$p.version}).rawData.'Game.Prefabs.BuildingData'.m_LotSize; $size=if($lot){" It needs a $([int]$lot.x*8) m wide (along the road) x $([int]$lot.y*8) m deep lot."}else{''}; throw "No free road-side site for $($p.name) within $rad m of ($($c.x),$($c.z))$(if($outside){" ($outside more were outside land you own)"}). Road sides there are already used by zoned buildings or other services. Build a short dead-end road into EMPTY UNZONED land and place it there, or raise -Radius.$size"}
+  if(!$tries.Count -and $Clear){
+   # Occupied road-sides: compute lot positions beside the nearest roads ourselves; the game bulldozes what is there.
+   $lotSize=(Bridge get_prefab_details @{index=$p.index;version=$p.version}).rawData.'Game.Prefabs.BuildingData'.m_LotSize
+   $depth=[double]$lotSize.y*4
+   $roads=@((Bridge get_network_edges @{x=$c.x;z=$c.z;radius=$rad}).edges|Where-Object {$_.prefab -notmatch 'Pipe|Cable|Voltage|Line|Highway'}|Sort-Object {SegDist $c $_.start $_.end}|Select-Object -First 4)
+   foreach($e in $roads){ $half=if($e.prefab -match 'Large'){15}elseif($e.prefab -match 'Medium'){10}else{6}
+    $dx=$e.end.x-$e.start.x;$dz=$e.end.z-$e.start.z;$len=[Math]::Sqrt($dx*$dx+$dz*$dz); if($len -lt 1){continue}; $tx=$dx/$len;$tz=$dz/$len
+    foreach($f in 0.3,0.5,0.7){ foreach($side in -1,1){ $ox=-$tz*$side;$oz=$tx*$side
+     $pos=[ordered]@{x=[Math]::Round($e.start.x+$dx*$f+$ox*($half+$depth),2);z=[Math]::Round($e.start.z+$dz*$f+$oz*($half+$depth),2)}
+     if($owned.Count -and !(InOwned $pos $owned)){continue}
+     if($tries.Count -lt 16){$tries+=[ordered]@{position=$pos;rotation=[Math]::Round([Math]::Atan2(-$ox,-$oz)*180/[Math]::PI,1)}} } } }
+  }  if(!$tries.Count){$lot=(Bridge get_prefab_details @{index=$p.index;version=$p.version}).rawData.'Game.Prefabs.BuildingData'.m_LotSize; $size=if($lot){" It needs a $([int]$lot.x*8) m wide (along the road) x $([int]$lot.y*8) m deep lot."}else{''}; throw "No free road-side site for $($p.name) within $rad m of ($($c.x),$($c.z))$(if($outside){" ($outside more were outside land you own)"}). Road sides there are already used by zoned buildings or other services. Build a short dead-end road into EMPTY UNZONED land and place it there, raise -Radius, or add -Clear to bulldoze what is in the way.$size"}
  }
  $log=@()
  foreach($t in $tries){
   $req=@{prefabIndex=$p.index;prefabVersion=$p.version;position=$t.position;rotation=$t.rotation;maxCost=$cost;previewOnly=$true}
+  if($Clear){$req.allowDemolition=$true}  # bulldoze whatever stands on the lot (houses, props) - explicit opt-in only
   try { $pv=Bridge place_building $req 30 } catch { $m=$_.Exception.Message; $why=if($m -match 'Reasons: ([^.]*)\.'){$Matches[1]}else{($m -split "`n")[0] -replace '^place_building failed: ',''}; $log+="  ($($t.position.x),$($t.position.z)) rot $($t.rotation): $why"; continue }
   # Spending guard: the preview knows the real price; keep -Reserve cash (default 50000) in the bank.
   if($pv.previewCost){ $money=[double](Status).money; if($money-[double]$pv.previewCost -lt $Reserve){ throw "$($p.name) costs $($pv.previewCost) but you have $([Math]::Round($money)); building it would leave less than the -Reserve of $Reserve. Wait for income (city.ps1 grow) or pass a lower -Reserve." } }  $build=$req.Clone(); $build.Remove('previewOnly')
@@ -697,7 +726,7 @@ $restore=$null
 try {
  if($Verb -ne 'help'){ try { $restore=[double](Status).selectedSpeed } catch { if($_.Exception.Message -match 'heartbeat'){throw (Explain 'status' $_.Exception.Message)}; throw } }
  switch($Verb){
-  'help'{Do-Help} 'status'{Do-Status} 'overview'{Do-Overview} 'speed'{Do-Speed} 'grow'{Do-Grow} 'find'{Do-Find}
+  'help'{Do-Help} 'status'{Do-Status} 'overview'{Do-Overview} 'happiness'{Do-Happiness} 'speed'{Do-Speed} 'grow'{Do-Grow} 'find'{Do-Find}
   'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'upgrade'{Do-Upgrade} 'link'{Do-Link} 'zone'{Do-Zone} 'place'{Do-Place}
   'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'cleanup'{Do-Cleanup} 'powerlink'{Do-PowerLink} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
   'land'{Do-Land} 'buyland'{Do-BuyLand} 'tax'{Do-Tax} 'problems'{Do-Problems} 'buy'{Do-Buy} 'milestones'{Do-Milestones} 'chirper'{Do-Chirper} 'save'{Do-Save} 'raw'{Do-Raw}

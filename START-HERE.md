@@ -33,6 +33,7 @@ This is the sequence that built Klanka Canyon, from an empty map to 1,000+ resid
 ./city.ps1 place -Name SewageOutlet01 -At 515,2140 -Rotation 180    # sewage, on a shoreline
 ./city.ps1 grow -Seconds 120 -Speed 4                               # let it grow
 ./city.ps1 overview                                                 # what does the city need next?
+./city.ps1 happiness                                                # what citizens like/dislike (crime, entertainment, pollution...) and what to build
 ./city.ps1 problems                                                 # the warning icons flashing in-game (traffic jams, no water...)
 ./city.ps1 cleanup                                                  # after a tornado/fire: clear destroyed and abandoned buildings so lots regrow
 ```
