@@ -347,7 +347,7 @@ function Do-Zone {
  if(!$From -or !$To){throw 'zone needs -From x,z -To x,z (opposite corners of the rectangle).'}
  $a=ParsePoint $From '-From'; $b=ParsePoint $To '-To'
  # The native marquee is limited to a 500 m diagonal: split big rectangles into tiles.
- $total=0; $skipped=0; $results=@()
+ $total=0; $skipped=0; $results=@(); $sawCells=$false
  foreach($tile in Zone-Tiles $a $b){
   $ta=$tile.a; $tb=$tile.b
   $mid=[ordered]@{x=($ta.x+$tb.x)/2;z=($ta.z+$tb.z)/2}
@@ -355,13 +355,14 @@ function Do-Zone {
   $cells=@((Bridge get_zone_cells @{x=$mid.x;z=$mid.z;radius=[Math]::Max(20,[Math]::Min(500,(Dist $ta $tb)/2+10));limit=4000}).cells|Where-Object {
    $_.position.x -ge $ta.x-8 -and $_.position.x -le $tb.x+8 -and $_.position.z -ge $ta.z-8 -and $_.position.z -le $tb.z+8 })
   if(!$cells.Count){$skipped++; continue}
+  $sawCells=$true
   $anchor=$cells|Sort-Object {Dist $_.position $ta}|Select-Object -First 1
   $req=@{prefabIndex=$z.index;prefabVersion=$z.version;start=@{index=$anchor.blockIndex;version=$anchor.blockVersion;x=$ta.x;z=$ta.z};end=@{x=$tb.x;z=$tb.z}}
   if($Preview){$req.previewOnly=$true}
   try { $r=Bridge zone_rectangle $req } catch { if($_.Exception.Message -match 'no_zone_cells_in_rectangle'){$skipped++;continue}; throw }
   $results+=$r; $total+=if($Preview){@($r.previewCells).Count}else{[int]$r.changedCells}
  }
- if(!$results.Count){throw "No zone cells inside $From .. $To. Zone cells exist only within ~48 m of a road; build roads there first."}
+ if(!$results.Count){ if($sawCells){throw "Nothing left to zone inside $From .. $To`: every road-side cell there is already zoned, built on or blocked. Pick new land (city.ps1 land / map) or build new streets first."}; throw "No zone cells inside $From .. $To. Zone cells exist only within ~48 m of a road; build roads there first."}
  Out-Result $results {
   $tiles=if($results.Count -gt 1){" in $($results.Count) tiles"}else{''}
   if($Preview){"PREVIEW ONLY - nothing changed. $($z.name) would cover $total cells$tiles. Run again without -Preview to apply."}
