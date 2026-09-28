@@ -21,7 +21,7 @@ param(
  [double]$Rotation=[double]::NaN, [int]$MaxCost=0, [int]$Reserve=50000,
  [int]$Seconds=60, [int]$Rate=-999, [int]$Speed=2, [int]$Limit=40, [double]$Step=100,
  [string]$Region='', [string]$Filter='', [string]$ArgsJson='{}',
- [switch]$Preview, [switch]$AllowWater, [switch]$AllowHighway, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
+ [switch]$Preview, [switch]$Replace, [switch]$AllowWater, [switch]$AllowHighway, [switch]$All, [switch]$Problems, [switch]$Json, [switch]$KeepPaused, [switch]$LibraryOnly
 )
 $ErrorActionPreference='Stop'
 $Kit=$PSScriptRoot
@@ -159,7 +159,7 @@ $Help=[ordered]@{
  road      = "road -Path 'x,z' 'x,z' ... [-Type small|medium|large|<exact name>]  - build a road through the points (long legs auto-split)."
  upgrade   = "upgrade -Path 'x,z' ... -Type large  - upgrade the road segment nearest each point (e.g. a jammed road to Large Road)."
  link      = "link -From index:version -To index:version [-Type hv|lv|water|sewage] [-Path 'x,z' ...]  - wire a power plant's high-voltage output to a TransformerStation01 (roads only carry low voltage)."
- zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Region NA|EU]  - paint zoning in a rectangle along roads."
+ zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Replace] [-Region NA|EU]  - paint zoning in a rectangle along roads. Existing zoning is kept unless -Replace (buildings already standing stay until demolished)."
  place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000)."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
  buildings = "buildings [-Filter text] [-Problems] [-At x,z -Radius 300]  - list your buildings (id, name, position, issues)."
@@ -422,6 +422,7 @@ function Do-Zone {
   $anchor=$cells|Sort-Object {Dist $_.position $ta}|Select-Object -First 1
   $req=@{prefabIndex=$z.index;prefabVersion=$z.version;start=@{index=$anchor.blockIndex;version=$anchor.blockVersion;x=$ta.x;z=$ta.z};end=@{x=$tb.x;z=$tb.z}}
   if($Preview){$req.previewOnly=$true}
+  if($Replace -and !$Preview){ try { $null=Bridge clear_zoning @{prefabIndex=$z.index;prefabVersion=$z.version;start=$req.start;end=$req.end} } catch { if($_.Exception.Message -notmatch 'no_zone_cells'){throw} } }  # zoning never overwrites; clear first
   try { $r=Bridge zone_rectangle $req } catch { if($_.Exception.Message -match 'no_zone_cells_in_rectangle'){$skipped++;continue}; throw }
   $results+=$r; $total+=if($Preview){@($r.previewCells).Count}else{[int]$r.changedCells}
  }
