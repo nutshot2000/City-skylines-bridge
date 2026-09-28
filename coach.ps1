@@ -90,7 +90,9 @@ function Diagnose($City,$Buildings,$Diagnostics) {
  [ordered]@{city=$City.cityName;money=$City.money;paused=($City.selectedSpeed -eq 0);controlEnabled=$City.controlEnabled;status='inspection_only_supply_not_certified';partial=$partial;utilityTotalsRaw=$utility;persistentShortages=@($Diagnostics.persistentShortages);buildings=$cards;next=$actions.ToArray();notes=@('Uses building-level evidence alongside city diagnostics.','Raw totals are not MW or m3 without a verified conversion. Capacity is not delivery.','A transformer node alone is not evidence of an external power feed.','A disconnected test pipe/road is not a working network. Native map ruins are excluded.')}
 }
 function Catalog([string]$Text) {
- $p=Call get_build_prefabs @{filter=$Text}
+ # Name filters are literal; 'Power' would miss WindTurbine01 and the cables, so widen utility words.
+ $words=if($Text -match '^(power|electric\w*)$'){@('Power','Wind','Voltage','Transformer','Solar')}elseif($Text -match '^water$'){@('Water','Groundwater')}else{@($Text)}
+ $p=@{prefabs=@($words|ForEach-Object {(Call get_build_prefabs @{filter=$_}).prefabs}|Sort-Object index -Unique)}
  if($All){return @($p.prefabs|Select-Object index,version,name,kind,locked)}
  @($p.prefabs|Where-Object { $_.kind -in @('building','network') -and $_.name -match 'WaterTower|WaterPumping|GroundwaterPumping|WastewaterTreatment|SewageOutlet|Water Pipe|Sewage Pipe|WindTurbine|PowerStation|PowerPlant|TransformerStation|Electricity Cable|Power Line|Voltage' -and $_.name -notmatch 'Additional|Extra|Advanced|Upgrade' }|Select-Object index,version,name,kind,locked)
 }
@@ -192,7 +194,10 @@ try {
    @{ready=($null -ne $s);stopLatched=$stopped;bridgeVersion=$s.modVersion;gameVersion=$s.gameVersion;controls=$s.controlEnabled;problem=$problem;next=if($stopped){'STOP latch is holding the checkbox off. Resume only with owner authorization; never clear it automatically.'}elseif(!$s){'Return from Options to the loaded city. Check game responsiveness and mod loading before sending requests.'}else{'Heartbeat is current. Queued responses still require completion polling.'};compatibility='A ready heartbeat is not build compatibility certification. Installation uses the exact Game.dll fingerprint.'}
   }
   'outside' {
-   if($Index -le 0 -or $Version -le 0){throw 'Supply a city-road node -Index and -Version from inspect. Building and prefab IDs are not road nodes.'}
+   if($Index -le 0 -or $Version -le 0){ # DLL 0.5.0+: list the map's highway entry points without a start node.
+    $listed=$null; try{$listed=Call get_outside_connections @{}}catch{}
+    if($listed){$listed;break}
+    throw 'Supply a city-road node -Index and -Version (coach.ps1 nearby -X -Z finds one). Building and prefab IDs are not road nodes.'}
    $s=Session
    if((Call get_capabilities).read -notcontains 'get_outside_connections'){throw 'Whole-map outside-road diagnosis needs the patched mod 0.4.3-coach.1. A camera-radius search cannot establish outside connectivity on this older mod.'}
    Call get_outside_connections @{index=$Index;version=$Version}
@@ -249,7 +254,9 @@ try {
    @{status=$done.status;reason=$done.reason;paused=$done.paused;advancedFrames=$done.advancedFrames;delta=$done.delta;next='Run doctor. This short interval may be insufficient; unchanged readings are inconclusive, not proof of success.'}
   }
  }
- if($result -is [System.Collections.IDictionary]){$result['guidance']=Get-AgentGuidance $result.status $result.error $result.id}else{$result|Add-Member -NotePropertyName guidance -NotePropertyValue (Get-AgentGuidance $result.status $result.error $result.id) -Force}
+ # Reads have no status field; they completed. Only mutations/operations carry a status.
+ $st=if($result.status){$result.status}elseif($result.error){'failed'}else{'response_received'}
+ if($result -is [System.Collections.IDictionary]){$result['guidance']=Get-AgentGuidance $st $result.error $result.id}else{$result|Add-Member -NotePropertyName guidance -NotePropertyValue (Get-AgentGuidance $st $result.error $result.id) -Force}
  $result|ConvertTo-Json -Depth 40
 } catch {
  @{guidance=(Get-AgentGuidance 'unknown' $_.Exception.Message);status=if($_.Exception.Message -match 'stagnant|reassess_required'){'stagnant_no_progress'}elseif($_.Exception.Message -match 'zone_has_no_growables|use_zoning_for_growables'){'invalid_zone'}elseif($_.Exception.Message -match 'finish_or_cancel|construction_busy|tool_operation'){'tool_busy'}else{'blocked_or_unknown'};error=$_.Exception.Message;next='Fix the stated precondition. If a request may have been sent, inspect its response/operation before doing anything again.'}|ConvertTo-Json -Depth 5

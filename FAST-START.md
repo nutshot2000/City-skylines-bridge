@@ -1,4 +1,6 @@
-# Start here: one useful action, then report
+# Careful workflow and recovery table
+
+> To simply play the game use [START-HERE.md](START-HERE.md) and `city.ps1`. This page is the cautious, evidence-first workflow for stuck tools, pending operations, stalled simulation and utility diagnosis.
 
 Use PowerShell 7.5 or later. Run commands from this kit folder. Prefer the helpers; do not write a new bridge client or scan raw game files.
 

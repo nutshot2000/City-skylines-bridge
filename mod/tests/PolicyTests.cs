@@ -29,6 +29,9 @@ internal static class PolicyTests
         Check(PlanGeometry.Overlap(lot,diamond),"rotated building overlap detected");
         Check(PlanGeometry.Overlap(diamond,lot)==PlanGeometry.Overlap(lot,diamond),"overlap detection is symmetric");
         bool zero=false;try{PlanGeometry.Corridor(1,1,1,1,8);}catch(ArgumentException){zero=true;}Check(zero,"degenerate road rejected");
+        foreach(var read in new[]{"get_buildings","get_city_diagnostics","get_zone_cells","find_building_sites","get_milestones","sample_terrain","get_network_edges"})Check(!PausePolicy.Pauses(read,false),"read "+read+" leaves the clock running");
+        foreach(var write in new[]{"build_road","place_building","zone_rectangle","batch_execute","demolish","pause_for_analysis"})Check(PausePolicy.Pauses(write,false),"mutation "+write+" still pauses first");
+        Check(PausePolicy.Pauses("get_buildings",true),"explicit pause:true pauses a read");
         return count;
     }
 }

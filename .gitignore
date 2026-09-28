@@ -7,7 +7,7 @@ test-results.txt
 .env
 .env.*
 
-mod/artifacts/
+mod/artifacts*/
 **/bin/
 **/obj/
 *.dll

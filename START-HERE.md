@@ -1,56 +1,70 @@
-# Utility Coach for Cities II Agent Bridge
+# Start here: play Cities: Skylines II with `city.ps1`
 
-Give your agent this folder and ask it to read **AGENTS.md**, then follow **FAST-START.md** and run **brief**. This helper kit works alongside the game mod. Optional patched mod source is now included under mod/; see INSTALL.md. The original downloaded release package remains unchanged.
-
-Requires Windows, PowerShell **7.5+**, and an already-working Cities II Agent Bridge mailbox. No Python, npm, API keys, model calls or extra packages. The supplied client fixes the timestamp parsing error observed with PowerShell 7.6. This does not fix or certify game-version compatibility.
-
-From this folder:
+`city.ps1` is the easy front door to the bridge. One verb per call, short readable output, names instead of IDs, and the game clock is put back after every call. You do not need to read the rest of the kit to build a working city.
 
 ```powershell
-pwsh -NoProfile -File ./coach.ps1 doctor
-pwsh -NoProfile -File ./coach.ps1 catalog -Filter Water
-pwsh -NoProfile -File ./coach.ps1 catalog -Filter Sewage
-pwsh -NoProfile -File ./coach.ps1 catalog -Filter Power
+pwsh -NoProfile -File ./city.ps1 help          # all verbs
+pwsh -NoProfile -File ./city.ps1 help zone     # one verb, with examples
 ```
 
-`doctor` gives a compact summary, issues and next steps. It excludes native map decorations and uses building-level observations alongside city diagnostics. `catalog` intentionally lists common utility assets rather than every building containing “water.” It is a name-based convenience filter, not an exhaustive or authoritative capability classifier. If a modded asset is missing, discover it using the original bridge and inspect its details.
+Coordinates are world metres written `x,z`: `x` grows east, `z` grows north. Heights are handled for you.
 
-| Command | Purpose | Changes the city? |
-|---|---|---|
-| doctor | Utility evidence and prioritized next steps | May pause through normal bridge analysis behavior |
-| catalog | Relevant prefab names, IDs and locks | May pause |
-| inspect | Entity plus nearby nodes and named network edges | May pause |
-| sites | Building requirements and geometric site candidates | May pause; not a native preview |
-| building-plan | Save a proposed building placement | Only writes a local plan; may pause for discovery |
-| connection-plan | Save a connection between two live nodes | Only writes a local plan; may pause for discovery |
-| apply | Save checkpoint, submit once, wait for result | Yes; requires existing owner authorization and enabled controls |
-| wait | Poll the original operation | No construction or retry |
-| settle | At most one short simulation interval, then pause | Yes; normal simulation can spend money |
+## Before the first command
 
-Plans expire after five minutes and belong to one city session. Each plan has a durable attempt record to prevent accidental replay even if its file is renamed. Keep `records/attempts` intact and use only one controlling agent. A plan is **not** a native approval. Native validation still runs when applying it.
+- The game is running with a city loaded, and not sitting in a menu.
+- The player has ticked **Options → Cities II Agent Bridge → Allow local bridge controls**. This resets every time a city is loaded. `status` shows `controls=ON`.
+- `city.ps1 status` answers. If it says the heartbeat is stale, the game is in a menu or loading.
 
-## Practical sequence
+## A first city in ten commands
 
-1. Run `doctor` and identify one missing link.
-2. Use `catalog` to copy an exact unlocked prefab name.
-3. For a building, use `sites`; check source/shoreline/pollution requirements. For a connection, use `inspect` on the relevant building and match its nearby node IDs to named network edges.
-4. Generate one plan with a maximum cost and reserve. Review its endpoint identities and utility layer.
-5. If the user has already authorized this construction, run `apply` once. It saves a checkpoint and waits for completion.
-6. Inspect the resulting entity and connection. Run `settle` once, then `doctor`. Stop if evidence remains unclear; do not build more speculative pipes.
+This is the sequence that built Klanka Canyon, from an empty map to 1,000+ residents with zero shortages:
 
-See **UTILITY-RECIPES.md** for the actual electricity/water/sewage decision tree, and **COMMAND-EXAMPLES.ps1** for commands with explicit placeholders. Do not copy entity IDs from an old test or another save.
+```powershell
+./city.ps1 status                                   # money, population, speed, controls
+./city.ps1 map -Radius 900                          # where is land, water, your roads? (# = your land)
+./city.ps1 roads                                    # the starter road the map gives you (already joined to the highway)
+./city.ps1 road -Path '473,1343' '473,1643' -Type medium            # a spine off the starter road
+./city.ps1 road -Path '273,1443' '673,1443' -Type small             # cross streets ~100 m apart
+./city.ps1 zone -Type residential -From 280,1395 -To 400,1692       # homes either side of the streets
+./city.ps1 zone -Type commercial  -From 408,1346 -To 540,1692       # shops along the spine
+./city.ps1 place -Name WindTurbine01  -At 470,1950                  # power
+./city.ps1 place -Name WaterTower01   -At 470,1740                  # water (groundwater)
+./city.ps1 place -Name SewageOutlet01 -At 515,2140 -Rotation 180    # sewage, on a shoreline
+./city.ps1 grow -Seconds 120 -Speed 4                               # let it grow
+./city.ps1 overview                                                 # what does the city need next?
+./city.ps1 problems                                                 # the warning icons flashing in-game (traffic jams, no water...)
+```
 
-## Reading results
+After that, repeat: `overview` → do the top item in NEXT → `grow` → `overview`.
 
-- `plan_only_no_construction`: a proposal exists; nothing was built.
-- `queued` / `running`: not finished. Poll the same operation ID.
-- `complete`: native operation completed. Utility delivery is still unproven.
-- `failed` / `interrupted`: inspect before choosing a different action.
-- `outcome_unknown`: do not repeat the command or delete its attempt record. Use the original ID and mailbox response.
-- `inspection_only_supply_not_certified`: observation, never an all-clear badge.
+## Rules that save you hours
 
-Raw responses are retained locally under `records/`. They can contain city names and positions; nothing is uploaded. To recover from changes, load a verified checkpoint through the game's normal Load Game menu.
+1. **Roads carry power, water and sewage.** A generator, water source and sewage outlet placed beside roads that connect to your streets supply every building on that road network. You do **not** need to lay pipes or cables along streets. Only lay them (`road -Type power|water|sewage`) to reach something that isn't beside a connected road.
+2. **Zone, don't place, houses and shops.** Zoning is free. Buildings grow by themselves while the game runs. `place` is for services and utilities only.
+3. **Zone cells only exist within ~48 m of a road.** Space parallel streets about 100 m apart so both sides get full-depth lots. `zone` splits big rectangles for you.
+4. **Reserve land for services before you zone.** A clinic needs about 88×48 m, a school more, and a cemetery 128×200 m. Once houses fill the road-sides, `place` has nowhere to go. Leave one block unzoned per district, or run a short dead-end road into empty land (`road`, then `place` beside it).
+5. **Keep industry away from homes.** Put it 250 m or more away, near the highway, and never upwind of housing. Keep sewage outlets away from water intakes.
+6. **Shoreline buildings sit exactly on the bank.** Sewage outlets and water pumps say `InWater` if they are too far out and `OverlapExisting` if they are on the road. Build a road a few metres from the water, then try `place` a few metres apart, or give an exact `-At` with `-Rotation`.
+7. **Demand for locked zones means grow.** `overview` tells you when demand is for medium or high density or for offices that aren't unlocked yet. Keep growing low density until the next milestone (`status`, or `milestones` with DLL 0.5.0+).
+8. **Services unlock with milestones and development points.** `find <word> -All` shows what is locked. `unlocks` lists development-tree nodes you can buy now, and `buy <NodeName>` spends the points.
+9. **Money:** early service upkeep makes the budget negative. It turns positive as population grows. Small tax nudges (`tax -Type Residential -Rate 12`) are fine.
+10. **Never resend a construction command that reported "still running".** Poll the id it gave you.
 
-If a previous test left STOP latched, reading a paused city still works. Resuming control requires renewed owner authorization, removal of only the STOP file and re-enabling Options → Cities II Agent Bridge → Allow local bridge controls after loading the city. The helper never does this automatically.
+## When something fails
 
-For one-call completion polling use agent.ps1. For non-invasive heartbeat/STOP diagnosis use coach.ps1 health. For whole-map road access use coach.ps1 outside with the patched DLL. See COMMANDS.md for canonical response keys and payload limits.
+`city.ps1` prints `ERROR:` plus a `HINT:` line with the usual fix. The common ones:
+
+| Message | Do this |
+|---|---|
+| controls OFF / `control_disabled` | Ask the player to tick the option again (it resets on load). |
+| heartbeat is stale | The game is in a menu or loading. Ask the player to return to the city. |
+| No free road-side site | Build a short dead-end road into empty, unzoned land you own, then `place` next to it. |
+| `OverlapExisting` | Move `-At` 10–20 m away from roads and buildings, or let `place` pick (omit `-Rotation`). |
+| `InWater` | Move toward land. |
+| zone type not usable yet | It's locked. `zones` lists what you can paint. |
+
+## More depth
+
+- `city.ps1 raw <command> -ArgsJson '{...}'` sends any bridge command. See [COMMAND-REFERENCE.md](COMMAND-REFERENCE.md) for every command and argument.
+- `coach.ps1` and [UTILITY-COACH.md](UTILITY-COACH.md) are the careful, evidence-first workflow for diagnosing a broken utility chain (connectors, node-to-node pipes, settle and doctor).
+- `agent.ps1` is the low-level "send once and wait" wrapper that `city.ps1` uses.

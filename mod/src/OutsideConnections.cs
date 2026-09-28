@@ -14,13 +14,28 @@ namespace CitiesIIAgentBridge
         private JObject OutsideConnections(JObject args)
         {
             var w = RequireCity(); var em = w.EntityManager;
-            if (args["index"] == null || args["version"] == null) throw new ArgumentException("road_node_index_and_version_required_from_get_network_not_building_or_prefab");
-            var start = new Entity { Index = RequiredInt(args, "index"), Version = RequiredInt(args, "version") };
-            if (!em.Exists(start) || !em.HasComponent<Node>(start)) throw new ArgumentException("start_must_be_current_road_node");
             var outside = new HashSet<Entity>();
             using (var q = em.CreateEntityQuery(ComponentType.ReadOnly<Node>(), ComponentType.ReadOnly<Game.Net.OutsideConnection>()))
             using (var nodes = q.ToEntityArray(Allocator.Temp)) foreach (var node in nodes)
                 if (!em.HasComponent<Deleted>(node) && !em.HasComponent<Game.Tools.Temp>(node)) outside.Add(node);
+            if (args["index"] == null || args["version"] == null)
+            {
+                // No start node (e.g. a brand-new city): list the map's road entry points so the
+                // agent knows where the highway enters. Connectivity is not evaluated.
+                var list = new JArray(); var ps = w.GetExistingSystemManaged<Game.Prefabs.PrefabSystem>();
+                foreach (var node in outside)
+                {
+                    string roadName = null;
+                    if (em.HasBuffer<ConnectedEdge>(node)) foreach (var link in em.GetBuffer<ConnectedEdge>(node, true))
+                        if (em.Exists(link.m_Edge) && em.HasComponent<Road>(link.m_Edge) && em.HasComponent<Game.Prefabs.PrefabRef>(link.m_Edge)) { roadName = ps.GetPrefabName(em.GetComponentData<Game.Prefabs.PrefabRef>(link.m_Edge).m_Prefab); break; }
+                    if (roadName == null) continue;
+                    var row = NativeBuild.Id(node); row["position"] = Vector(em.GetComponentData<Node>(node).m_Position); row["road"] = roadName; list.Add(row);
+                }
+                return new JObject { ["status"] = "listed_only", ["outsideRoadNodes"] = list,
+                    ["next"] = "Pass index/version of one of YOUR road nodes (get_network or get_nearby_infrastructure) to check whether it physically reaches these entry points. New maps usually ship a starter road already joined to the highway; get_nearby_infrastructure at the camera finds it." };
+            }
+            var start = new Entity { Index = RequiredInt(args, "index"), Version = RequiredInt(args, "version") };
+            if (!em.Exists(start) || !em.HasComponent<Node>(start)) throw new ArgumentException("start_must_be_current_road_node");
             var queue = new Queue<Entity>(); var seen = new HashSet<Entity>(); var previous = new Dictionary<Entity, Entity>();
             queue.Enqueue(start); seen.Add(start); bool limited = false;
             while (queue.Count > 0 && !limited)

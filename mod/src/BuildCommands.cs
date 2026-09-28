@@ -25,7 +25,10 @@ namespace CitiesIIAgentBridge
             {
                 if (!ps.TryGetPrefab<PrefabBase>(e, out var p) || (!(p is NetPrefab) && !(p is ZonePrefab) && !(p is BuildingPrefab) && !(p is ServicePrefab))) continue;
                 if (p.name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                rows.Add(new JObject { ["index"] = e.Index, ["version"] = e.Version, ["name"] = p.name, ["kind"] = p is ZonePrefab ? "zone" : p is BuildingPrefab ? "building" : p is ServicePrefab ? "service" : "network", ["locked"] = IsPrefabLocked(em, e) });
+                bool locked = IsPrefabLocked(em, e);
+                var row = new JObject { ["index"] = e.Index, ["version"] = e.Version, ["name"] = p.name, ["kind"] = p is ZonePrefab ? "zone" : p is BuildingPrefab ? "building" : p is ServicePrefab ? "service" : "network", ["locked"] = locked };
+                if (locked) row["unlockedBy"] = UnlockBlockers(em, ps, e);
+                rows.Add(row);
             }
             return new JObject { ["prefabs"] = rows };
         }
@@ -87,11 +90,34 @@ namespace CitiesIIAgentBridge
         {
             var w = RequireCity(); CheckBuildTool(w);
             var p = BuildPrefab<ZonePrefab>(w, args); var a = BuildPoint(w, args["start"] as JObject); var b = BuildPoint(w, args["end"] as JObject);
-            if (math.distance(a.m_Position, b.m_Position) > 500) throw new ArgumentException("zoning_rectangle_too_large");
+            if (math.distance(a.m_Position.xz, b.m_Position.xz) > 500) throw new ArgumentException("zoning_rectangle_too_large_max_500m_diagonal_split_it");
+            // 0.5.0: a plain {x,z} start is anchored to the zone block owning the nearest cell,
+            // so agents no longer have to harvest block IDs with get_zone_cells first.
+            if (a.m_OriginalEntity == Entity.Null) a.m_OriginalEntity = NearestZoneBlock(w, a.m_Position, b.m_Position);
             if ((bool?)args["dezone"] != true && GrowableCount(w, w.GetExistingSystemManaged<PrefabSystem>().GetEntity(p)) == 0) throw new ArgumentException("zone_has_no_growables_use_get_zone_catalog");
             if (!w.EntityManager.HasComponent<Block>(a.m_OriginalEntity)) throw new ArgumentException("start_requires_zone_block_index_and_version_from_get_zone_cells");
             var zoneTool = w.GetExistingSystemManaged<BridgeZoneTool>(); zoneTool.PreviewOnly = (bool?)args["previewOnly"] == true; zoneTool.Dezone = (bool?)args["dezone"] == true; zoneTool.Begin(p, a, b);
             return ConstructionAccess.Status(ConstructionAccess.Active);
+        }
+        // Zone block whose cell is nearest to the rectangle's start corner, preferring cells inside the rectangle.
+        private static Entity NearestZoneBlock(World w, float3 start, float3 end)
+        {
+            var em = w.EntityManager; Entity best = Entity.Null; float bestDistance = float.MaxValue;
+            float2 lo = math.min(start.xz, end.xz) - 8, hi = math.max(start.xz, end.xz) + 8;
+            using (var q = em.CreateEntityQuery(new EntityQueryDesc { All = new[] { ComponentType.ReadOnly<Block>(), ComponentType.ReadOnly<Cell>() }, None = new[] { ComponentType.ReadOnly<Temp>(), ComponentType.ReadOnly<Game.Common.Deleted>() } }))
+            using (var es = q.ToEntityArray(Allocator.Temp)) foreach (var e in es)
+            {
+                var block = em.GetComponentData<Block>(e);
+                if (math.distance(block.m_Position.xz, start.xz) > 600) continue;
+                for (int y = 0; y < block.m_Size.y; y++) for (int x = 0; x < block.m_Size.x; x++)
+                {
+                    float2 c = ZoneUtils.GetCellPosition(block, new int2(x, y)).xz;
+                    if (math.any(c < lo) || math.any(c > hi)) continue;
+                    float d = math.distance(c, start.xz); if (d < bestDistance) { bestDistance = d; best = e; }
+                }
+            }
+            if (best == Entity.Null) throw new ArgumentException("no_zone_cells_in_rectangle_zone_cells_exist_only_within_48m_of_roads");
+            return best;
         }
         private JObject Network(JObject args)
         {

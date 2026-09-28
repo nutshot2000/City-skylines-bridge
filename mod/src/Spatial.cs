@@ -59,7 +59,8 @@ namespace CitiesIIAgentBridge
             float radius=args["radius"]==null?150:RequiredFloat(args,"radius"); if(radius<16||radius>500) throw new ArgumentException("site_radius_must_be_16_to_500");
             float x=RequiredFloat(args,"x"),z=RequiredFloat(args,"z");
             var edges=(JArray)NetworkEdges(new JObject{["x"]=x,["z"]=z,["radius"]=radius})["edges"];
-            var candidates=new JArray();
+            var candidates=new JArray(); int overlapping=0, outsideCity=0;
+            var owned=OwnedTileBoxes(w);
             foreach(JObject edge in edges.OrderBy(e=> (int)e["index"]))
             {
                 var entity=new Entity{Index=(int)edge["index"],Version=(int)edge["version"]};
@@ -67,7 +68,7 @@ namespace CitiesIIAgentBridge
                 var netPrefab=em.GetComponentData<PrefabRef>(entity).m_Prefab;
                 float halfRoad=em.HasComponent<NetGeometryData>(netPrefab)?em.GetComponentData<NetGeometryData>(netPrefab).m_DefaultWidth*0.5f:8;
                 var curve=em.GetComponentData<Game.Net.Curve>(entity).m_Bezier;
-                foreach(float t in new[]{0.25f,0.5f,0.75f}) foreach(int side in new[]{-1,1})
+                foreach(float t in new[]{0.1f,0.25f,0.4f,0.5f,0.6f,0.75f,0.9f}) foreach(int side in new[]{-1,1})
                 {
                     float u=1-t; float3 centre=u*u*u*curve.a+3*u*u*t*curve.b+3*u*t*t*curve.c+t*t*t*curve.d;
                     float3 tangent=math.normalizesafe(3*u*u*(curve.b-curve.a)+6*u*t*(curve.c-curve.b)+3*t*t*(curve.d-curve.c));
@@ -75,12 +76,31 @@ namespace CitiesIIAgentBridge
                     float3 pos=centre+outward*(halfRoad+lot.y*4); if(math.distance(pos.xz,new float2(x,z))>radius) continue;
                     // Local +Z is the front of the lot, facing back toward the road.
                     float rotation=math.degrees(math.atan2(-outward.x,-outward.z));
+                    // The game refuses buildings outside purchased map tiles; find_building_sites used to suggest them.
+                    if(owned.Count>0 && !owned.Any(b=>pos.x>=b.x && pos.x<=b.z && pos.z>=b.y && pos.z<=b.w)) { outsideCity++; continue; }
                     var candidate=new JObject{["position"]=Vector(pos),["rotation"]=rotation,["roadEdge"]=NativeBuild.Id(entity),["curvePosition"]=t};
-                    if(!LotOverlaps(w,pos,quaternion.RotateY(math.radians(rotation)),(float2)lot*4,Entity.Null)) candidates.Add(candidate);
+                    if(!LotOverlaps(w,pos,quaternion.RotateY(math.radians(rotation)),(float2)lot*4,Entity.Null)) candidates.Add(candidate); else overlapping++;
                 }
             }
             var sorted=new JArray(candidates.OrderBy(c=>math.distance(new float2((float)c["position"]["x"],(float)c["position"]["z"]),new float2(x,z))).Take(16));
-            return new JObject{["prefabIndex"]=pe.Index,["prefabVersion"]=pe.Version,["candidates"]=sorted,["validation"]="Geometric candidates only. Native preview checks road access, terrain, city limits, cost, and remaining collisions before placement."};
+            return new JObject{["prefabIndex"]=pe.Index,["prefabVersion"]=pe.Version,["lotSizeCells"]=new JArray(lot.x,lot.y),["lotSizeMetres"]=new JArray(lot.x*8,lot.y*8),
+                ["candidates"]=sorted,["rejectedOverlappingBuildings"]=overlapping,["rejectedOutsideOwnedTiles"]=outsideCity,
+                ["next"]=sorted.Count==0?"No free road-side lot here. Roadsides are taken by buildings, or the area is outside your land. Build a short road into empty unzoned land you own, then retry near it.":null,
+                ["validation"]="Geometric candidates only. Native preview checks road access, terrain, zoning, cost, and remaining collisions before placement."};
+        }
+        // Purchased map tiles as axis-aligned boxes: x=minX, y=minZ, z=maxX, w=maxZ.
+        private static System.Collections.Generic.List<float4> OwnedTileBoxes(Unity.Entities.World w)
+        {
+            var em=w.EntityManager; var boxes=new System.Collections.Generic.List<float4>();
+            using(var q=em.CreateEntityQuery(ComponentType.ReadOnly<Game.Areas.MapTile>()))
+            using(var es=q.ToEntityArray(Unity.Collections.Allocator.Temp)) foreach(var e in es)
+            {
+                if(em.HasComponent<Game.Common.Native>(e) || !em.HasBuffer<Game.Areas.Node>(e)) continue;
+                var b=new float4(float.MaxValue,float.MaxValue,float.MinValue,float.MinValue);
+                foreach(var n in em.GetBuffer<Game.Areas.Node>(e,true)) b=new float4(math.min(b.x,n.m_Position.x),math.min(b.y,n.m_Position.z),math.max(b.z,n.m_Position.x),math.max(b.w,n.m_Position.z));
+                boxes.Add(b);
+            }
+            return boxes;
         }
         private static bool LotOverlaps(Unity.Entities.World w,float3 p,quaternion rotation,float2 half,Entity ignore)
         {

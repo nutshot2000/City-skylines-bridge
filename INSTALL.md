@@ -32,6 +32,6 @@ pwsh -NoProfile -File ./mod/install-local.ps1 -GamePath 'YOUR_ACTUAL_GAME_FOLDER
 
 The installer backs up the existing DLL and verifies the replacement. It does not stop, launch, or restart the game, clear STOP, or change a save.
 
-Launch the game and load a test save. Confirm version **0.4.3-coach.1** through `health`. Enable **Options → Cities II Agent Bridge → Allow local bridge controls**, then close Options. If the checkbox reverts, check the STOP status: remove only the STOP file after the owner authorizes resuming, then re-enable the checkbox. City loads reset permission.
+Launch the game and load a test save. Confirm version **0.5.0-coach.1** through `health` (or `city.ps1 status`). Enable **Options → Cities II Agent Bridge → Allow local bridge controls**, then close Options. If the checkbox reverts, check the STOP status: remove only the STOP file after the owner authorizes resuming, then re-enable the checkbox. City loads reset permission.
 
 This fork compiled against a local installation reporting **1.3.6f1**. Upstream 0.4.2 documents a **1.6.0f1** target. Neither number should be silently rewritten to match the other: runtime version, exact assembly fingerprint and validation status are different facts. A successful build is not in-game validation. Other game builds may require source adaptation.

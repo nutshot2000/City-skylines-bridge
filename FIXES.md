@@ -69,3 +69,32 @@ Added connection-check (three reads maximum), automatic post-build endpoint-path
 
 ## 0.4.9-coach.1 — connector discovery and explicit-node elevation
 Added get_utility_connectors and coach connectors. Fixed explicit-node input metadata: native FixElevation can lower an already-buried position and clear its attachment when the bridge labels it surface elevation. Restore explicit node anchors after input snapping with existing burial metadata; keep preview and post-apply attachment checks. No automatic routing or delivery certification.
+
+# Agent usability — 0.5.0-coach.1 (2026-09-28)
+
+Found by playing a new city ("Klanka Canyon") from an empty map to 1,000+ residents through the bridge.
+
+## Helpers (work immediately, any DLL)
+
+- **city.ps1**: an easy front-end for less capable models. Verbs `status overview map roads road zone place grow find zones buildings inspect demolish unlocks buy milestones budget tax chirper save raw`. Names instead of IDs, readable output, `-Json` for machines. It restores the game speed after every call, because bridge reads used to leave the city frozen.
+  - `road` splits legs over 900 m and builds a multi-point path in one batch.
+  - `zone` accepts words (`residential`, `commercial`, `industrial`, `residential-row`…), finds a live zone-block anchor itself, and tiles rectangles larger than the 500 m marquee limit.
+  - `place` tries road-side sites near a point until the native preview accepts one. It skips sites outside owned map tiles and prints native reasons (`OverlapExisting`, `InWater`) and the lot size when nothing fits.
+  - `overview` gives a one-screen report with a NEXT list that only suggests zones you can actually paint, and says when demand is for locked density.
+  - `map` is an ASCII map of land, water, roads and owned tiles.
+- **COMMAND-REFERENCE.md**: every raw command and argument, taken from the C# handlers. `get_capabilities` only listed names, so agents guessed arguments (`get_city_map` → `number_required: x`).
+- **START-HERE.md** rewritten as a play guide, and **AGENTS.md** shortened. The key correction: roads carry power, water and sewage, so pipe and cable webs along streets are unnecessary. The old Whinnitt playbook laid them everywhere, and that caused most attachment-validator failures. The former START-HERE is now UTILITY-COACH.md.
+- coach.ps1: successful reads reported `guidance.outcome: unknown … do not repeat a mutation`; they now report `completed`. `catalog -Filter Power` missed WindTurbine01, the cables and transformers because the name filter is literal; utility words now widen. `outside` without a node lists entry points (DLL 0.5.0).
+- bridge.ps1 had drifted from bridge-client.ps1: it lacked the preview-safety guard and `get_utility_connectors`. It now forwards to bridge-client.ps1.
+- zone.ps1 printed `changedCells count=1` because applied zoning returns a number, not a list.
+- Test suite: test-city.ps1 (27 offline checks).
+
+## Mod (needs the DLL built and installed with the game closed)
+
+- **Reads no longer pause the city.** Only mutations (build/zone/place/demolish/batch/purchases/save/cancel_tool) or an explicit `{"pause":true}` pause it. See PausePolicy.cs. With controls off, reads still work while the game runs.
+- `get_notifications`: the in-game warning icons (traffic jams, no water/power, no workers, abandoned…) grouped by type with locations and the building or road they are attached to. `city.ps1 problems` shows them with suggested fixes, and `overview` lists the top four.
+- `get_milestones`: achieved milestone, XP and next threshold, and rewards and direct unlocks per milestone. `get_status` includes a milestone summary.
+- `get_build_prefabs`: locked rows include `unlockedBy` (names of the milestone, service or dev-tree node still locked).
+- `zone_rectangle`: a plain `{x,z}` start is anchored to the nearest zone block automatically. Clearer errors for oversized rectangles and cell-less areas.
+- `find_building_sites`: skips candidates outside purchased tiles (the game refuses them), samples 7 positions per road edge instead of 3, and reports `lotSizeMetres`, rejection counts and a `next` hint.
+- `get_outside_connections` without a node lists the map's road entry points instead of failing. A brand-new city has no player node.
