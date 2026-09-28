@@ -55,6 +55,7 @@ function Explain([string]$Command,[string]$Err,$Result=$null) {
   'no_zone_cells_in_rectangle' {'The rectangle contains no zone cells. Zone cells only exist along roads.';break}
   'game_rejected_placement' {'The game refused this spot. Reasons: ' + ((@($Result.placementErrors.nativeReasons.type)|Sort-Object -Unique) -join ', ') + '. OverlapExisting = hits a road/building; InWater = too far into water; move a few metres or let place pick a site.';break}
   'batch_step_failed' { $i=[int]$Result.failureIndex; $s=@($Result.results)[$i]; $why=((@($s.placementErrors.nativeReasons.type)|Where-Object {$_}|Sort-Object -Unique) -join ', '); "Segment $($i+1) failed: $($s.error)$(if($why){" ($why)"}). Earlier segments WERE built - do not resend them.$(if($s.error -match 'budget|cost'){' Not enough money above the -Reserve cash floor (default 50000): wait for income or pass a lower -Reserve.'}elseif($why -match 'Overlap'){' OverlapExisting on a road usually means it crosses another road at a different height (bridge) or a building.'})";break}
+  'cost_exceeds_budget' {'The price is higher than the spend limit: either you cannot afford it above -Reserve, or (bridge DLL before 0.5.3) the item costs more than the old 1,000,000 per-build cap.';break}
   'budget|insufficient|money' {'Not enough money or maxCost too low. Raise -MaxCost or check city.ps1 status.';break}
   'batch_in_progress' {'A batch is still running. Wait, then run city.ps1 status.';break}
   'no_loaded_city' {'No city is loaded. Ask the player to load a save.';break}
@@ -455,7 +456,10 @@ function Do-Zone {
 function Do-Place {
  $p=Resolve-Prefab $Name 'building'
  $c=if($At){ParsePoint $At '-At'}else{Center}
- $cost=if($MaxCost){$MaxCost}else{1000000}
+ # Spend limit = what you can afford above the reserve (the preview then reports the exact price).
+ $cost=if($MaxCost){$MaxCost}else{[int][Math]::Max(1,[Math]::Min(100000000,[double](Status).money-$Reserve))}
+ $ver=try{(Get-Content (Join-Path $Mailbox 'session.json') -Raw -ErrorAction Stop|ConvertFrom-Json).modVersion}catch{''}  # heartbeat file is rewritten 4x/second
+ $modCap=if(!$ver -or $ver -match '^0\.(4|5\.[0-2])\.'){1000000}else{100000000}; $cost=[Math]::Min($cost,$modCap)
  $tries=@()
  if(![double]::IsNaN($Rotation)){ $tries+=[ordered]@{position=$c;rotation=$Rotation} }
  else {

@@ -22,7 +22,7 @@ namespace CitiesIIAgentBridge
             var point = BuildPoint(w, args["position"] as JObject);
             float rotation = args["rotation"] == null ? 0 : RequiredFloat(args, "rotation");
             point.m_Rotation = quaternion.RotateY(math.radians(rotation));
-            int budget = RequiredInt(args, "maxCost"); if (budget < 0 || budget > 1000000) throw new ArgumentException("invalid_budget");
+            int budget = RequiredInt(args, "maxCost"); if (budget < 0 || budget > 100000000) throw new ArgumentException("invalid_budget_0_to_100000000"); // 0.5.3: was 1,000,000, which made Hospital01 ($1.88M) unplaceable
             Entity move = Entity.Null;
             if (args["moveIndex"] != null) { move = new Entity { Index = RequiredInt(args, "moveIndex"), Version = RequiredInt(args, "moveVersion") }; if (!w.EntityManager.Exists(move) || !w.EntityManager.HasComponent<Game.Buildings.Building>(move)) throw new ArgumentException("invalid_building_to_move"); }
             ControlPoint[] candidates = null;
