@@ -36,7 +36,7 @@ $script:PausedByUs=$false
 function Bridge([string]$Command,$Arguments=@{},[int]$Wait=60) {
  if($Command -notin $NonPausing){$script:PausedByUs=$true}
  $json=if($Arguments -is [string]){$Arguments}else{$Arguments|ConvertTo-Json -Depth 30 -Compress}
- $raw=& $Agent -Command $Command -ArgsJson $json -WaitSeconds ([Math]::Min(60,$Wait)) 2>$null
+ $raw=& $Agent -Command $Command -ArgsJson $json -WaitSeconds ([Math]::Min(60,$Wait)) 2>$null 3>$null
  $r=($raw -join "`n")|ConvertFrom-Json -DateKind String
  if($r.status -eq 'pending_do_not_resubmit'){throw "STILL RUNNING: $Command is not finished. Do NOT resend it. Check later with: city.ps1 raw get_operation -ArgsJson '{`"id`":`"$($r.operationId)`"}'"}
  if($r.error){throw (Explain $Command $r.error)}
@@ -505,7 +505,7 @@ function Do-Place {
  foreach($t in $tries){
   $req=@{prefabIndex=$p.index;prefabVersion=$p.version;position=$t.position;rotation=$t.rotation;maxCost=$cost;previewOnly=$true}
   if($Clear){$req.allowDemolition=$true}  # bulldoze whatever stands on the lot (houses, props) - explicit opt-in only
-  try { $pv=Bridge place_building $req 30 } catch { $m=$_.Exception.Message; $why=if($m -match 'Reasons: ([^.]*)\.'){$Matches[1]}else{($m -split "`n")[0] -replace '^place_building failed: ',''}; $log+="  ($($t.position.x),$($t.position.z)) rot $($t.rotation): $why"; continue }
+  try { $pv=Bridge place_building $req 30 } catch { $m=$_.Exception.Message; if($m -match 'use_zoning_for_growables|prefab_stale_or_locked|incorrect_prefab_type|control_disabled'){ throw ($m + $(if($m -match 'growables'){"`n  HINT: $($p.name) is a zoned (growable) building: zone land and let it grow. Signature/landmark buildings need bridge DLL 0.5.4+."})) }; $why=if($m -match 'Reasons: ([^.]*)\.'){$Matches[1]}else{($m -split "`n")[0] -replace '^place_building failed: ',''}; $log+="  ($($t.position.x),$($t.position.z)) rot $($t.rotation): $why"; continue }
   # Spending guard: the preview knows the real price; keep -Reserve cash (default 50000) in the bank.
   if($pv.previewCost){ $money=[double](Status).money; if($money-[double]$pv.previewCost -lt $Reserve){ throw "$($p.name) costs $($pv.previewCost) but you have $([Math]::Round($money)); building it would leave less than the -Reserve of $Reserve. Wait for income (city.ps1 grow) or pass a lower -Reserve." } }  $build=$req.Clone(); $build.Remove('previewOnly')
   $r=Bridge place_building $build 60

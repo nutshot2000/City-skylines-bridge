@@ -18,7 +18,9 @@ namespace CitiesIIAgentBridge
         {
             var w = RequireCity(); RequireControl(); CheckBuildTool(w);
             var prefab = BuildPrefab<BuildingPrefab>(w, args);
-            if (w.EntityManager.HasComponent<SpawnableBuildingData>(w.GetExistingSystemManaged<PrefabSystem>().GetEntity(prefab))) throw new ArgumentException("use_zoning_for_growables_get_zone_catalog");
+            var prefabEntity = w.GetExistingSystemManaged<PrefabSystem>().GetEntity(prefab);
+            // Growables come from zoning, but signature (landmark) buildings are placed by the player once each (0.5.4).
+            if (w.EntityManager.HasComponent<SpawnableBuildingData>(prefabEntity) && !w.EntityManager.HasComponent<SignatureBuildingData>(prefabEntity)) throw new ArgumentException("use_zoning_for_growables_get_zone_catalog");
             var point = BuildPoint(w, args["position"] as JObject);
             float rotation = args["rotation"] == null ? 0 : RequiredFloat(args, "rotation");
             point.m_Rotation = quaternion.RotateY(math.radians(rotation));
