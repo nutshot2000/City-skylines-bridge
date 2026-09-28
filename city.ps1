@@ -79,7 +79,7 @@ function OwnedBoxes {
   [pscustomobject]@{x0=($px|Measure-Object -Minimum).Minimum;x1=($px|Measure-Object -Maximum).Maximum;z0=($pz|Measure-Object -Minimum).Minimum;z1=($pz|Measure-Object -Maximum).Maximum} })
  return $script:OwnedCache
 }
-function InOwned($p,$boxes){ foreach($b in $boxes){ if($p.x -ge $b.x0 -and $p.x -le $b.x1 -and $p.z -ge $b.z0 -and $p.z -le $b.z1){return $true} }; return $false }
+function DistToLand($Pos){ $own=@(OwnedBoxes); if(!$own.Count){return 0.0}; ($own|ForEach-Object {[Math]::Sqrt([Math]::Pow([Math]::Max(0.0,[double][Math]::Max([double]($_.x0-$Pos.x),[double]($Pos.x-$_.x1))),2)+[Math]::Pow([Math]::Max(0.0,[double][Math]::Max([double]($_.z0-$Pos.z),[double]($Pos.z-$_.z1))),2))}|Measure-Object -Minimum).Minimum }function InOwned($p,$boxes){ foreach($b in $boxes){ if($p.x -ge $b.x0 -and $p.x -le $b.x1 -and $p.z -ge $b.z0 -and $p.z -le $b.z1){return $true} }; return $false }
 function Dist($a,$b){[Math]::Sqrt(([double]$a.x-[double]$b.x)*([double]$a.x-[double]$b.x)+([double]$a.z-[double]$b.z)*([double]$a.z-[double]$b.z))}
 function Out-Result($Object,[scriptblock]$Text) { if($Json){$Object|ConvertTo-Json -Depth 30}else{& $Text} }
 
@@ -164,7 +164,7 @@ $Help=[ordered]@{
  buildings = "buildings [-Filter text] [-Problems] [-At x,z -Radius 300]  - list your buildings (id, name, position, issues)."
  inspect   = "inspect -Id index:version  - details of one building/road/node."
  demolish  = "demolish -Id index:version  - bulldoze one building or road segment you own."
- unlocks   = "unlocks  - development points and development-tree nodes you can buy now."
+ unlocks   = "unlocks [-Type Electricity] [-Filter NodeName]  - development points; nodes you can buy now, one tree branch, or the prerequisite chain of a node."
  buy       = "buy <NodeName|index:version>  - spend development points on one tree node (see unlocks)."
  milestones= "milestones  - XP progress and what the next milestones unlock (DLL 0.5.0+)."
  land      = "land  - map tiles you can buy next to your city, with direction and how much is water."
@@ -402,7 +402,7 @@ function Do-Place {
   }
   return
  }
- throw "The game rejected every site tried for $($p.name):`n$($log -join "`n")`n  HINT: OverlapExisting = too close to a road/building, InWater = too far into water (shoreline buildings need the exact bank). Try another -At, or -Rotation with a hand-picked spot."
+ throw "The game rejected every site tried for $($p.name):`n$($log -join "`n")`n  HINT: OverlapExisting = too close to a road/building, InWater = too far into water (shoreline buildings need the exact bank), ExceedsCityLimits = part of it sticks out of land you own (move inward or buy the tile: city.ps1 land). Try another -At, or -Rotation with a hand-picked spot."
 }
 
 function Do-Buildings {
@@ -429,6 +429,14 @@ function Do-Unlocks {
  Out-Result $d {
   "development points: $($d.developmentPoints)   city XP: $($d.cityXp)"
   $nodes=@($d.nodes)
+  if($Type){
+   # One branch of the in-game Development tree, e.g. unlocks -Type Electricity
+   $branch=@($nodes|Where-Object {$_.service.name -match $Type})
+   if(!$branch.Count){"no branch matches '$Type'. Branches: $((@($nodes.service.name)|Sort-Object -Unique) -join ', ')"; return}
+   "$($branch[0].service.name) branch:"
+   $branch|Sort-Object cost,name|ForEach-Object {"  {0,-34} cost {1}  {2}" -f $_.name,$_.cost,$(if(!$_.locked){'OWNED'}elseif($_.purchasable){"can buy now (city.ps1 buy $($_.name))"}else{'needs an earlier node first'})}
+   return
+  }
   if($Filter){
    # Show the prerequisite chain for matching nodes, e.g. unlocks -Filter LargeRoads
    $byId=@{}; foreach($n in $nodes){$byId["$($n.index):$($n.version)"]=$n}
@@ -502,7 +510,7 @@ function Do-Problems {
   if(!$cl.Count){ $cl=@($types|ForEach-Object {$ty=$_.type; @($_.examples)|Group-Object {"{0},{1}" -f [Math]::Floor($_.position.x/400),[Math]::Floor($_.position.z/400)}|ForEach-Object {[pscustomobject]@{type=$ty;count=$_.Count;centre=$_.Group[0].position}}}) }
   $own=@(OwnedBoxes)
   $far=@(); $nearby=@()
-  foreach($c in ($cl|Sort-Object count -Descending)){ $d=($own|ForEach-Object {[Math]::Sqrt([Math]::Pow([Math]::Max(0.0,[double][Math]::Max([double]($_.x0-$c.centre.x),[double]($c.centre.x-$_.x1))),2)+[Math]::Pow([Math]::Max(0.0,[double][Math]::Max([double]($_.z0-$c.centre.z),[double]($c.centre.z-$_.z1))),2))}|Measure-Object -Minimum).Minimum
+  foreach($c in ($cl|Sort-Object count -Descending)){ $d=DistToLand $c.centre
    $line="    {0} x{1} around ({2:N0},{3:N0}) - {4}" -f $c.type,$c.count,$c.centre.x,$c.centre.z,$(if($d -lt 1){'INSIDE your land'}else{"$([Math]::Round($d)) m outside your land"})
    if($d -gt 2000){$far+=$line}else{$nearby+=$line} }
   'where (400 m clusters):'; $nearby|Select-Object -First 12
@@ -580,7 +588,7 @@ function Do-Overview {
  if([double]$d.budget.balanceRaw -lt 0){$next.Add("Budget negative ($($d.budget.balanceRaw)/month): grow population, raise taxes a little, or trim service budgets.")}
  $top=@($pen|Group-Object factor|Sort-Object Count -Descending|Select-Object -First 4)
  foreach($t in $top){ if($t.Name -eq 'NotEnoughEmployees'){ if((@($d.demand.residential)|Measure-Object -Maximum).Maximum -gt 30){$next.Add("$($t.Count) businesses lack workers: zone more housing.")}else{$next.Add("$($t.Count) businesses lack workers, but housing demand is low: residents are still moving in ($([int]$c.populationWithMoveIn-[int]$c.population)) or commutes are too long. Keep growing; avoid zoning more jobs for now.")} } elseif($t.Name -eq 'WindSpeed'){} else {$next.Add("$($t.Count) buildings penalised by $($t.Name).")} }
- try { $icons=Bridge get_notifications @{examples=1}; foreach($g in @($icons.types|Where-Object {$_.type -ne 'Selected'})|Select-Object -First 4){ $ex=@($g.examples)[0]; $next.Add("$($g.count) '$($g.type)' warning icon(s), e.g. at ($([Math]::Round($ex.position.x)),$([Math]::Round($ex.position.z))). $(Advice $g.type)  (city.ps1 problems)") } } catch {}
+ try { $icons=Bridge get_notifications @{examples=20}; foreach($g in @($icons.types|Where-Object {$_ -and $_.type -ne 'Selected'})|Select-Object -First 4){ $near=@($g.examples|Where-Object {(DistToLand $_.position) -lt 2000}); if(!$near.Count){continue}; $ex=$near[0]; $next.Add("$($g.count) '$($g.type)' warning icon(s), e.g. at ($([Math]::Round($ex.position.x)),$([Math]::Round($ex.position.z))). $(Advice $g.type)  (city.ps1 problems)") } } catch {}
  if(!$next.Count){$next.Add('No urgent problems. Grow (city.ps1 grow), then expand roads + zoning as demand rises.')}
  $o=[ordered]@{city=$c;demand=$d.demand;budget=$d.budget;utilities=$u;shortages=$groups|ForEach-Object {@{type=$_.Name;count=$_.Count}};penalties=$top|ForEach-Object {@{factor=$_.Name;count=$_.Count}};buildings=$d.buildingCount;underConstruction=$d.underConstruction;next=$next}
  Out-Result $o {
