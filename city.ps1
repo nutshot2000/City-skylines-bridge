@@ -459,7 +459,7 @@ function Do-Place {
  # Spend limit = what you can afford above the reserve (the preview then reports the exact price).
  $cost=if($MaxCost){$MaxCost}else{[int][Math]::Max(1,[Math]::Min(100000000,[double](Status).money-$Reserve))}
  $ver=try{(Get-Content (Join-Path $Mailbox 'session.json') -Raw -ErrorAction Stop|ConvertFrom-Json).modVersion}catch{''}  # heartbeat file is rewritten 4x/second
- $modCap=if(!$ver -or $ver -match '^0\.(4|5\.[0-2])\.'){1000000}else{100000000}; $cost=[Math]::Min($cost,$modCap)
+ $modCap=if(!$ver -or $ver -match '^0\.(4\.|5\.[0-2][^0-9])'){1000000}else{100000000}; $cost=[Math]::Min($cost,$modCap)
  $tries=@()
  if(![double]::IsNaN($Rotation)){ $tries+=[ordered]@{position=$c;rotation=$Rotation} }
  else {
