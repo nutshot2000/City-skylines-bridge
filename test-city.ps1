@@ -31,6 +31,7 @@ Check ([Math]::Abs($area-740*450) -lt 1) 'tiles cover the whole rectangle exactl
 Check (@(Zone-Tiles (ParsePoint '400,1692') (ParsePoint '280,1395'))[0].a.x -eq 280) 'reversed corners are normalised'
 
 # --- fake bridge
+$script:FakeMoney=1000000
 $script:Sent=[System.Collections.Generic.List[object]]::new()
 function Bridge([string]$Command,$Arguments=@{},[int]$Wait=60){
  $script:Sent.Add([pscustomobject]@{command=$Command;args=$Arguments})
@@ -56,6 +57,7 @@ function Bridge([string]$Command,$Arguments=@{},[int]$Wait=60){
     if($Arguments.previewOnly -and $Arguments.position.x -eq 10){throw 'place_building failed: game_rejected_placement'+"`n"+'  HINT: The game refused this spot. Reasons: OverlapExisting. OverlapExisting = ...'}
     return [pscustomobject]@{status='complete';previewCost=25000;createdBuildings=@([pscustomobject]@{index=77;version=2})} }
   'sample_terrain' { return [pscustomobject]@{samples=@(@($Arguments.points)|ForEach-Object {[pscustomobject]@{position=[pscustomobject]@{x=$_.x;y=380;z=$_.z};waterDepth=$(if($_.z -gt 5000){12}else{0})}})} }
+  'get_status' { return [pscustomobject]@{city=[pscustomobject]@{money=$script:FakeMoney;selectedSpeed=1}} }
   'batch_execute' { return [pscustomobject]@{status='complete';steps=@($Arguments.steps).Count;completed=@($Arguments.steps).Count;moneySpent=100} }
   default { throw "unexpected command $Command" }
  }
@@ -86,6 +88,10 @@ $builds=@($script:Sent|Where-Object {$_.command -eq 'place_building' -and !$_.ar
 Check (@($previews|Where-Object {$_.args.position.x -eq 500}).Count -eq 0) 'site outside owned tiles is never previewed'
 Check ($previews.Count -eq 2 -and $builds.Count -eq 1 -and $builds[0].args.position.x -eq 20) 'rejected preview falls through to the next site, then builds once'
 Check (($out -join ' ') -match 'id: 77:2') 'place reports the created building id'
+$script:Sent.Clear(); $script:FakeMoney=60000
+Check (Throws {Do-Place} 'less than the -Reserve') 'place refuses a build that would drop money below the reserve'
+Check (@($script:Sent|Where-Object {$_.command -eq 'place_building' -and !$_.args.previewOnly}).Count -eq 0) 'nothing is built when the reserve would be broken'
+$script:FakeMoney=1000000
 
 # --- road builds one batch with split legs
 $script:Sent.Clear(); $Type='small'; $Path=@('355,1240','-700,1240'); $Rest=@(); $From=''; $To=''

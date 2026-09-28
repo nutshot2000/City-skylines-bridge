@@ -159,7 +159,7 @@ $Help=[ordered]@{
  road      = "road -Path 'x,z' 'x,z' ... [-Type small|medium|large|<exact name>]  - build a road through the points (long legs auto-split)."
  upgrade   = "upgrade -Path 'x,z' ... -Type large  - upgrade the road segment nearest each point (e.g. a jammed road to Large Road)."
  zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Region NA|EU]  - paint zoning in a rectangle along roads."
- place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one."
+ place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000)."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
  buildings = "buildings [-Filter text] [-Problems] [-At x,z -Radius 300]  - list your buildings (id, name, position, issues)."
  inspect   = "inspect -Id index:version  - details of one building/road/node."
@@ -392,7 +392,8 @@ function Do-Place {
  foreach($t in $tries){
   $req=@{prefabIndex=$p.index;prefabVersion=$p.version;position=$t.position;rotation=$t.rotation;maxCost=$cost;previewOnly=$true}
   try { $pv=Bridge place_building $req 30 } catch { $m=$_.Exception.Message; $why=if($m -match 'Reasons: ([^.]*)\.'){$Matches[1]}else{($m -split "`n")[0] -replace '^place_building failed: ',''}; $log+="  ($($t.position.x),$($t.position.z)) rot $($t.rotation): $why"; continue }
-  $build=$req.Clone(); $build.Remove('previewOnly')
+  # Spending guard: the preview knows the real price; keep -Reserve cash (default 50000) in the bank.
+  if($pv.previewCost){ $money=[double](Status).money; if($money-[double]$pv.previewCost -lt $Reserve){ throw "$($p.name) costs $($pv.previewCost) but you have $([Math]::Round($money)); building it would leave less than the -Reserve of $Reserve. Wait for income (city.ps1 grow) or pass a lower -Reserve." } }  $build=$req.Clone(); $build.Remove('previewOnly')
   $r=Bridge place_building $build 60
   $made=@($r.createdBuildings)|ForEach-Object {"$($_.index):$($_.version)"}
   $o=[ordered]@{prefab=$p.name;position=$t.position;rotation=$t.rotation;created=$made;result=$r}
