@@ -161,7 +161,7 @@ $Help=[ordered]@{
  zone      = "zone -Type residential|commercial|industrial|office|... -From x,z -To x,z [-Preview] [-Region NA|EU]  - paint zoning in a rectangle along roads."
  place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
- buildings = "buildings [-Filter text] [-Problems]  - list your buildings (id, name, position, issues)."
+ buildings = "buildings [-Filter text] [-Problems] [-At x,z -Radius 300]  - list your buildings (id, name, position, issues)."
  inspect   = "inspect -Id index:version  - details of one building/road/node."
  demolish  = "demolish -Id index:version  - bulldoze one building or road segment you own."
  unlocks   = "unlocks  - development points and development-tree nodes you can buy now."
@@ -406,13 +406,17 @@ function Do-Place {
 }
 
 function Do-Buildings {
- $r=Bridge get_buildings @{filter=$Filter;problemsOnly=[bool]$Problems}
+ $req=@{filter=$Filter;problemsOnly=[bool]$Problems;limit=[Math]::Max(1,[Math]::Min(2000,$Limit))}
+ if($At){$p=ParsePoint $At '-At'; $req.x=$p.x; $req.z=$p.z; $req.radius=if([double]::IsNaN($Radius)){300}else{$Radius}}
+ $r=Bridge get_buildings $req
  $b=@($r.buildings)
+ if($At -and $null -eq $r.total){ $b=@($b|Where-Object {(Dist $_.position $p) -le $req.radius}) }  # older DLLs ignore x/z
  Out-Result $r {
-  "$($b.Count) buildings$(if($Problems){' with problems'})$(if($Filter){" matching '$Filter'"})$(if($r.possiblyTruncated){' (truncated at 512)'}):"
+  $count=if($null -ne $r.total){$r.total}else{$b.Count}
+  "$count buildings$(if($Problems){' with problems'})$(if($Filter){" matching '$Filter'"})$(if($At){" within $($req.radius) m of $At"})$(if($null -eq $r.total -and $r.possiblyTruncated){' (DLL before 0.5.2 stops at 512; use -At to look at one area)'}):"
   $b|Sort-Object prefab|Select-Object -First $Limit|ForEach-Object {
    "  {0,-11} {1,-36} ({2,6:N0},{3,6:N0}){4}{5}" -f "$($_.index):$($_.version)",$_.prefab,$_.position.x,$_.position.z,$(if($_.underConstruction){' [building]'}),$(if(@($_.issues).Count){'  ! '+(@($_.issues) -join ',')}) }
-  if($b.Count -gt $Limit){"  ... $($b.Count-$Limit) more (use -Limit or -Filter)"}
+  if($count -gt [Math]::Min($Limit,$b.Count)){"  ... $($count-[Math]::Min($Limit,$b.Count)) more (use -Limit, -Filter or -At)"}
  }
 }
 

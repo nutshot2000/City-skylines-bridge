@@ -98,3 +98,10 @@ Found by playing a new city ("Klanka Canyon") from an empty map to 1,000+ reside
 - `zone_rectangle`: a plain `{x,z}` start is anchored to the nearest zone block automatically. Clearer errors for oversized rectangles and cell-less areas.
 - `find_building_sites`: skips candidates outside purchased tiles (the game refuses them), samples 7 positions per road edge instead of 3, and reports `lotSizeMetres`, rejection counts and a `next` hint.
 - `get_outside_connections` without a node lists the map's road entry points instead of failing. A brand-new city has no player node.
+
+## 0.5.1 / 0.5.2-coach.1 (found while playing past 4,000 residents)
+
+- 0.5.1: traffic icons report the road (walks lane → edge owner) and the player's selection marker is no longer listed as a problem.
+- 0.5.2: `get_notifications` returns `clusters` (400 m cells per type, with centre and count), so one wildfire, a far-off one and a jam can be told apart when there are hundreds of icons. `city.ps1 problems` shows each cluster's distance to your land.
+- 0.5.2: `get_buildings` pages (`offset`, `limit` ≤ 2000, `total`, `nextOffset`) and accepts `x`,`z`,`radius`. It used to stop silently at 512 rows, and a 1,800-building city reported no homes in its newest district.
+- Helpers: `land`/`buyland` (buyable neighbouring tiles with water share), `upgrade` (widen the road nearest a point), `unlocks -Filter` (prerequisite chain), road water check (`-AllowWater`), reason-aware batch hints, and a zone message distinguishing "area already full" from "no roads".

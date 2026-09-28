@@ -133,10 +133,19 @@ namespace CitiesIIAgentBridge
         private JObject Buildings(JObject args)
         {
             var w = RequireCity(); var em = w.EntityManager; var rows = new JArray(); string filter = (string)args["filter"] ?? "";
+            // 0.5.2: paging. A 1,800-building city silently lost everything after row 512.
+            int offset = (int?)args["offset"] ?? 0, limit = (int?)args["limit"] ?? 512, matched = 0;
+            if (offset < 0 || limit < 1 || limit > 2000) throw new ArgumentException("offset_must_be_0_or_more_and_limit_1_to_2000");
+            bool useArea = args["x"] != null && args["z"] != null; float2 centre = useArea ? new float2(RequiredFloat(args, "x"), RequiredFloat(args, "z")) : float2.zero;
+            float radius = args["radius"] == null ? 300 : RequiredFloat(args, "radius");
+            var ps = w.GetExistingSystemManaged<PrefabSystem>();
             foreach (var e in NativeBuild.Buildings(em))
             {
                 if ((bool?)args["includeNative"] != true && em.HasComponent<Game.Common.Native>(e)) continue;
-                var info = Inspect(w, e); if (((string)info["prefab"] ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (useArea && (!em.HasComponent<Game.Objects.Transform>(e) || math.distance(em.GetComponentData<Game.Objects.Transform>(e).m_Position.xz, centre) > radius)) continue;
+                // Cheap name filter before the expensive full inspection.
+                if (filter.Length > 0 && (!em.HasComponent<PrefabRef>(e) || (ps.GetPrefabName(em.GetComponentData<PrefabRef>(e).m_Prefab) ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)) continue;
+                var info = Inspect(w, e);
                 info["serviceDataRaw"] = Details(w,e);
                 var b = em.GetComponentData<Game.Buildings.Building>(e); info["roadEdge"] = NativeBuild.Id(b.m_RoadEdge); info["buildingFlags"] = b.m_Flags.ToString();
                 var issues = new JArray(); if (b.m_RoadEdge == Entity.Null || !em.Exists(b.m_RoadEdge)) issues.Add("no_road_connection");
@@ -155,9 +164,11 @@ namespace CitiesIIAgentBridge
                 if (em.HasComponent<Game.Buildings.WaterConsumer>(e)) { var c = em.GetComponentData<Game.Buildings.WaterConsumer>(e); if (c.m_FulfilledFresh < c.m_WantedConsumption) issues.Add("fresh_water_shortfall"); if (c.m_FulfilledSewage < c.m_WantedConsumption) issues.Add("sewage_shortfall"); }
                 if (em.HasComponent<Game.Buildings.ElectricityConsumer>(e)) { var c = em.GetComponentData<Game.Buildings.ElectricityConsumer>(e); if (c.m_FulfilledConsumption < c.m_WantedConsumption) issues.Add("electricity_shortfall"); }
                 info["diagnosisStatus"] = issues.Count > 0 ? "recognised_issues" : "no_recognised_issue_not_certified"; info["issues"] = issues; if ((bool?)args["problemsOnly"] == true && issues.Count == 0) continue;
-                rows.Add(info); if (rows.Count >= 512) break;
+                int ordinal = matched++; if (ordinal < offset || rows.Count >= limit) continue;
+                rows.Add(info);
             }
-            return new JObject { ["buildings"] = rows, ["limit"] = 512, ["possiblyTruncated"] = rows.Count >= 512, ["problemsOnly"] = (bool?)args["problemsOnly"] == true, ["nativeExcluded"] = (bool?)args["includeNative"] != true, ["meaning"] = "Only recognised component checks. Empty issues or zero filtered rows are not a health certificate. UI notification reasons are not collected. Use get_buildings for all city buildings." };
+            bool more = offset + rows.Count < matched;
+            return new JObject { ["buildings"] = rows, ["total"] = matched, ["offset"] = offset, ["limit"] = limit, ["nextOffset"] = more ? (int?)(offset + rows.Count) : null, ["possiblyTruncated"] = more, ["problemsOnly"] = (bool?)args["problemsOnly"] == true, ["nativeExcluded"] = (bool?)args["includeNative"] != true, ["meaning"] = "Only recognised component checks. Empty issues or zero filtered rows are not a health certificate. UI notification reasons are not collected. Use get_buildings for all city buildings." };
         }
     }
 }
