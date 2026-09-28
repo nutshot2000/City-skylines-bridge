@@ -410,7 +410,7 @@ function Do-PowerLink {
 function Do-Cleanup {
  # After a disaster or abandonment: bulldoze every building carrying a destroyed/collapsed/abandoned icon
  # so its zoned lot can regrow. Only acts on buildings the game itself has flagged.
- $pattern=if($Filter){$Filter}else{'Destroyed|Collapsed|Abandon'}
+ $pattern=if($Filter){$Filter}else{'Destroyed|Collapsed|Abandon|Burned'}
  $r=Bridge get_notifications @{filter='';examples=50}
  $ids=@($r.types|Where-Object {$_ -and $_.type -match $pattern}|ForEach-Object {@($_.examples)}|Where-Object {$_.on.kind -eq 'building'}|ForEach-Object {"$($_.on.index):$($_.on.version)"}|Sort-Object -Unique)
  $total=(@($r.types|Where-Object {$_ -and $_.type -match $pattern})|Measure-Object count -Sum).Sum
@@ -577,6 +577,7 @@ $IconAdvice=[ordered]@{
  'Road|Access'='connect this building to the road network'
  'Abandon'='fix the cause (utilities, taxes, demand) or demolish'
  'Crime'='place a police station nearby (city.ps1 find police)'
+ 'Burned'='the building is gone: city.ps1 cleanup clears it so the lot regrows; add fire coverage nearby'
  'Fire|Burn'='place a fire station nearby (city.ps1 find fire)'
  'Sick|Health|Hospital'='more clinics/hospitals'
  'Dead|Death|Hearse'='cemetery or crematorium capacity'
