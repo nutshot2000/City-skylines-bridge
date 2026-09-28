@@ -24,7 +24,7 @@ namespace CitiesIIAgentBridge
             float2 centre = useArea ? new float2(RequiredFloat(args, "x"), RequiredFloat(args, "z")) : float2.zero;
             float radius = args["radius"] == null ? 500 : RequiredFloat(args, "radius");
             var groups = new Dictionary<string, (IconPriority priority, List<JObject> rows, int count)>();
-            int total = 0;
+            int total = 0; var clusters = new Dictionary<string, (string type, float3 sum, int count)>();
             using (var q = em.CreateEntityQuery(new EntityQueryDesc { All = new[] { ComponentType.ReadOnly<Icon>(), ComponentType.ReadOnly<PrefabRef>() }, None = new[] { ComponentType.ReadOnly<Game.Common.Deleted>(), ComponentType.ReadOnly<Game.Tools.Temp>() } }))
             using (var es = q.ToEntityArray(Allocator.Temp)) foreach (var e in es)
             {
@@ -35,6 +35,10 @@ namespace CitiesIIAgentBridge
                 if (type == "Selected") continue; // the player's selection marker, not a city problem
                 if (type.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 total++;
+                // 400 m clusters per type so one big wildfire and a far-away one are told apart.
+                string cell = type + "|" + (int)math.floor(icon.m_Location.x / 400) + "|" + (int)math.floor(icon.m_Location.z / 400);
+                if (!clusters.TryGetValue(cell, out var cl)) cl = (type, float3.zero, 0);
+                clusters[cell] = (type, cl.sum + icon.m_Location, cl.count + 1);
                 if (!groups.TryGetValue(type, out var g)) g = (icon.m_Priority, new List<JObject>(), 0);
                 g.count++;
                 if (g.rows.Count < perType)
@@ -60,7 +64,8 @@ namespace CitiesIIAgentBridge
             }
             var list = new JArray(groups.OrderByDescending(kv => (int)kv.Value.priority).ThenByDescending(kv => kv.Value.count)
                 .Select(kv => new JObject { ["type"] = kv.Key, ["priority"] = kv.Value.priority.ToString(), ["count"] = kv.Value.count, ["examples"] = new JArray(kv.Value.rows) }));
-            return new JObject { ["total"] = total, ["types"] = list,
+            var clusterRows = new JArray(clusters.Values.OrderByDescending(c => c.count).Take(40).Select(c => new JObject { ["type"] = c.type, ["count"] = c.count, ["centre"] = Vector(c.sum / c.count) }));
+            return new JObject { ["total"] = total, ["types"] = list, ["clusters"] = clusterRows,
                 ["meaning"] = "Live in-game warning icons (the ones that flash over buildings/roads). type is the notification prefab name, e.g. TrafficJam or NoWater; on = the building/road it is attached to. Icons appear and clear as the simulation runs." };
         }
     }

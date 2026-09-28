@@ -54,7 +54,7 @@ function Explain([string]$Command,[string]$Err,$Result=$null) {
   'start_requires_zone_block' {'Zoning needs a road nearby: zone cells only exist within ~48 m of a road.';break}
   'no_zone_cells_in_rectangle' {'The rectangle contains no zone cells. Zone cells only exist along roads.';break}
   'game_rejected_placement' {'The game refused this spot. Reasons: ' + ((@($Result.placementErrors.nativeReasons.type)|Sort-Object -Unique) -join ', ') + '. OverlapExisting = hits a road/building; InWater = too far into water; move a few metres or let place pick a site.';break}
-  'batch_step_failed' { $i=[int]$Result.failureIndex; $s=@($Result.results)[$i]; $why=((@($s.placementErrors.nativeReasons.type)|Where-Object {$_}|Sort-Object -Unique) -join ', '); "Segment $($i+1) failed: $($s.error)$(if($why){" ($why)"}). Earlier segments WERE built - do not resend them. OverlapExisting on a road usually means it crosses another road at a different height (bridge) or runs along one.";break}
+  'batch_step_failed' { $i=[int]$Result.failureIndex; $s=@($Result.results)[$i]; $why=((@($s.placementErrors.nativeReasons.type)|Where-Object {$_}|Sort-Object -Unique) -join ', '); "Segment $($i+1) failed: $($s.error)$(if($why){" ($why)"}). Earlier segments WERE built - do not resend them.$(if($s.error -match 'budget|cost'){' Not enough money above the -Reserve cash floor (default 50000): wait for income or pass a lower -Reserve.'}elseif($why -match 'Overlap'){' OverlapExisting on a road usually means it crosses another road at a different height (bridge) or a building.'})";break}
   'budget|insufficient|money' {'Not enough money or maxCost too low. Raise -MaxCost or check city.ps1 status.';break}
   'batch_in_progress' {'A batch is still running. Wait, then run city.ps1 status.';break}
   'no_loaded_city' {'No city is loaded. Ask the player to load a save.';break}
@@ -167,6 +167,8 @@ $Help=[ordered]@{
  unlocks   = "unlocks  - development points and development-tree nodes you can buy now."
  buy       = "buy <NodeName|index:version>  - spend development points on one tree node (see unlocks)."
  milestones= "milestones  - XP progress and what the next milestones unlock (DLL 0.5.0+)."
+ land      = "land  - map tiles you can buy next to your city, with direction and how much is water."
+ buyland   = "buyland -At x,z [-MaxCost n]  - buy the map tile containing that point."
  budget    = "budget  - taxes, income and expenses by source."
  tax       = "tax -Type Residential|Commercial|Industrial|Office -Rate n  - set a tax rate (-10..30)."
  chirper   = "chirper [-Limit 20]  - latest citizen posts (clues, not facts)."
@@ -487,15 +489,50 @@ function Do-Problems {
  if($At){$c=ParsePoint $At '-At'; $req.x=$c.x; $req.z=$c.z; $req.radius=if([double]::IsNaN($Radius)){500}else{$Radius}}
  try { $r=Bridge get_notifications $req } catch { if($_.Exception.Message -match 'unknown_command|ValidateSet|does not belong'){throw 'get_notifications needs bridge DLL 0.5.0-coach.1 (see INSTALL.md). Until then use: city.ps1 buildings -Problems'}; throw }
  Out-Result $r {
-  $types=@($r.types|Where-Object {$_.type -ne 'Selected'})
+  $types=@($r.types|Where-Object {$_ -and $_.type -ne 'Selected'})
   if(!$types.Count){'no warning icons right now'; return}
   "$($r.total) warning icons on the map:"
-  foreach($g in $types){
+  # Where are the problems? Clusters (DLL 0.5.2+) or grouped examples, with distance to your land.
+  $cl=@($r.clusters|Where-Object {$_ -and $_.type -ne 'Selected'})
+  if(!$cl.Count){ $cl=@($types|ForEach-Object {$ty=$_.type; @($_.examples)|Group-Object {"{0},{1}" -f [Math]::Floor($_.position.x/400),[Math]::Floor($_.position.z/400)}|ForEach-Object {[pscustomobject]@{type=$ty;count=$_.Count;centre=$_.Group[0].position}}}) }
+  $own=@(OwnedBoxes)
+  $far=@(); $nearby=@()
+  foreach($c in ($cl|Sort-Object count -Descending)){ $d=($own|ForEach-Object {[Math]::Sqrt([Math]::Pow([Math]::Max(0.0,[double][Math]::Max([double]($_.x0-$c.centre.x),[double]($c.centre.x-$_.x1))),2)+[Math]::Pow([Math]::Max(0.0,[double][Math]::Max([double]($_.z0-$c.centre.z),[double]($c.centre.z-$_.z1))),2))}|Measure-Object -Minimum).Minimum
+   $line="    {0} x{1} around ({2:N0},{3:N0}) - {4}" -f $c.type,$c.count,$c.centre.x,$c.centre.z,$(if($d -lt 1){'INSIDE your land'}else{"$([Math]::Round($d)) m outside your land"})
+   if($d -gt 2000){$far+=$line}else{$nearby+=$line} }
+  'where (400 m clusters):'; $nearby|Select-Object -First 12
+  if($far.Count){"    ($($far.Count) cluster(s) more than 2 km outside your land - usually safe to ignore)"}  foreach($g in $types){
    "  $($g.type) x$($g.count) [$($g.priority)]$(if($a=Advice $g.type){"  -> $a"})"
    foreach($ex in @($g.examples)|Select-Object -First ([Math]::Min(5,$Limit))){ "      at ({0:N0},{1:N0}){2}" -f $ex.position.x,$ex.position.z,$(if($ex.on){" on $($ex.on.kind) $($ex.on.prefab) $($ex.on.index):$($ex.on.version)"}) }
   }
  }
 }
+function TileBox($t){ $px=@($t.polygon.x);$pz=@($t.polygon.z); [pscustomobject]@{id="$($t.index):$($t.version)";index=$t.index;version=$t.version;owned=[bool]$t.purchased;x0=($px|Measure-Object -Minimum).Minimum;x1=($px|Measure-Object -Maximum).Maximum;z0=($pz|Measure-Object -Minimum).Minimum;z1=($pz|Measure-Object -Maximum).Maximum} }
+function Do-Land {
+ $r=Bridge get_tiles; $boxes=@($r.tiles|ForEach-Object {TileBox $_}); $own=@($boxes|Where-Object owned)
+ $near={param($b) foreach($o in $own){ $dx=[Math]::Max(0,[Math]::Max($o.x0-$b.x1,$b.x0-$o.x1)); $dz=[Math]::Max(0,[Math]::Max($o.z0-$b.z1,$b.z0-$o.z1)); $ox=[Math]::Min($o.x1,$b.x1)-[Math]::Max($o.x0,$b.x0); $oz=[Math]::Min($o.z1,$b.z1)-[Math]::Max($o.z0,$b.z0); if(($dx -lt 2 -and $oz -gt 10) -or ($dz -lt 2 -and $ox -gt 10)){return $true} }; $false}
+ $adj=@($boxes|Where-Object {!$_.owned -and (& $near $_)})
+ # Sample each candidate's centre and corners for water so the agent doesn't buy a lake.
+ $pts=foreach($b in $adj){ foreach($f in @(@(0.5,0.5),@(0.2,0.2),@(0.8,0.2),@(0.2,0.8),@(0.8,0.8))){ @{x=$b.x0+($b.x1-$b.x0)*$f[0];z=$b.z0+($b.z1-$b.z0)*$f[1]} } }
+ $s=if($pts){@((Bridge sample_terrain @{points=@($pts)}).samples)}else{@()}
+ $ox=($own.x0+$own.x1|Measure-Object -Average).Average; $oz=($own.z0+$own.z1|Measure-Object -Average).Average
+ $rows=for($i=0;$i -lt $adj.Count;$i++){ $b=$adj[$i]; $wet=@($s[($i*5)..($i*5+4)]|Where-Object {$_.waterDepth -gt 0.5}).Count; $cx=($b.x0+$b.x1)/2; $cz=($b.z0+$b.z1)/2
+  $dir=(@(if($cz -gt $oz+300){'north'}elseif($cz -lt $oz-300){'south'}) + @(if($cx -gt $ox+300){'east'}elseif($cx -lt $ox-300){'west'})) -join '-'
+  [pscustomobject]@{id=$b.id;dir=$dir;centre="$([Math]::Round($cx)),$([Math]::Round($cz))";water="$($wet*20)%";box=$b} }
+ Out-Result $rows {
+  "you own $($own.Count) tiles; $($r.availablePurchases) more may be bought (milestones grant more). Buyable tiles touching your land:"
+  $rows|Sort-Object {[int]($_.water -replace '%')}|ForEach-Object {"  {0,-9} {1,-11} centre {2,-12} water {3}" -f $_.id,$_.dir,$_.centre,$_.water}
+  'buy with: city.ps1 buyland -At x,z   (any point inside the tile; mostly-dry tiles are best)'
+ }
+}
+function Do-BuyLand {
+ $p=if($At){ParsePoint $At '-At'}else{throw 'buyland -At x,z (a point inside the tile, see city.ps1 land)'}
+ $t=@((Bridge get_tiles).tiles|ForEach-Object {TileBox $_}|Where-Object {$p.x -ge $_.x0 -and $p.x -le $_.x1 -and $p.z -ge $_.z0 -and $p.z -le $_.z1})|Select-Object -First 1
+ if(!$t){throw "No map tile contains ($($p.x),$($p.z))."}; if($t.owned){throw "You already own the tile at ($($p.x),$($p.z))."}
+ $r=Bridge purchase_tiles @{tiles=@(@{index=$t.index;version=$t.version});maxCost=$(if($MaxCost){$MaxCost}else{500000})}
+ Out-Result $r {"bought tile $($t.id) (x $([Math]::Round($t.x0))..$([Math]::Round($t.x1)), z $([Math]::Round($t.z0))..$([Math]::Round($t.z1))) for $($r.cost)."}
+}
+
 function Do-Budget {
  $m=Bridge get_city_management
  Out-Result $m {
@@ -562,7 +599,7 @@ try {
   'help'{Do-Help} 'status'{Do-Status} 'overview'{Do-Overview} 'speed'{Do-Speed} 'grow'{Do-Grow} 'find'{Do-Find}
   'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'upgrade'{Do-Upgrade} 'zone'{Do-Zone} 'place'{Do-Place}
   'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
-  'tax'{Do-Tax} 'problems'{Do-Problems} 'buy'{Do-Buy} 'milestones'{Do-Milestones} 'chirper'{Do-Chirper} 'save'{Do-Save} 'raw'{Do-Raw}
+  'land'{Do-Land} 'buyland'{Do-BuyLand} 'tax'{Do-Tax} 'problems'{Do-Problems} 'buy'{Do-Buy} 'milestones'{Do-Milestones} 'chirper'{Do-Chirper} 'save'{Do-Save} 'raw'{Do-Raw}
   default {throw "Unknown verb '$Verb'. Run: city.ps1 help"}
  }
 } catch {
