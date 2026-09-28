@@ -97,3 +97,7 @@ Found live and fixed in source (needs the next DLL install): traffic icons repor
 
 ### 0.5.2 live test — 2026-09-28 (pop 6,630)
 Installed 0.5.2-coach.1 with a backup. The version shows in `status`. `buildings -At 1810,1843 -Radius 250` returned 339 buildings (0.5.1 returned 0 because of the 512-row cap). `problems` lists 400 m clusters with distance to owned land. Found live: SmallCoalPowerPlant01 showed "Powerline Not Connected" because big plants output high voltage and roads carry low voltage. Fixed by placing TransformerStation01 and a node-anchored High-voltage Line between the plant's and transformer's free connector nodes (get_utility_connectors). A HV ground cable was refused (`attached_node_depth_outside_prefab_range`). The overhead line first failed with ExceedsCityLimits because the plant's connector sat 2 m from the tile edge; it succeeded after buying the tile, and the warning cleared. New `city.ps1 link` automates this.
+
+### 0.5.3 live test — 2026-09-28 (pop 9,410)
+Hospital01 placed for 1,880,000 (0.5.2 rejected any build over 1,000,000). Afterwards happiness rose from 66 to 74. The outside power line was connected by placing TransformerStation01 beside the map's end pylon, and exports now earn ~40k/month. A tornado destroyed 52 homes; `city.ps1 cleanup` cleared them in one batch.
+

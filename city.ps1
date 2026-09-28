@@ -657,7 +657,7 @@ function Do-Overview {
  $next=[System.Collections.Generic.List[string]]::new()
  function Pct($a,$b){ if([double]$b -gt 0){[Math]::Round(100*[double]$a/[double]$b)}else{$null} }
  $ep=Pct $u.electricity.production $u.electricity.capacity; $wp=Pct $u.water.production $u.water.capacity; $sp=Pct $u.sewage.processing $u.sewage.capacity
- if([double]$u.electricity.capacity -eq 0){$next.Add('No power: place a generator beside a connected road (city.ps1 find wind / find power).')}elseif($ep -ge 80){$next.Add("Power $ep% used: add another generator soon.")}
+ if([double]$u.electricity.capacity -eq 0){$next.Add('No power: place a generator beside a connected road (city.ps1 find wind / find power).')}elseif($ep -ge 80){ $exp=[double]$d.budget.incomeBySourceRaw.ExportElectricity; $imp=[double]$d.budget.expenseBySourceRaw.ImportElectricity; if($exp -gt 0 -and $imp -le 0){$next.Add("Power $ep% used, but surplus is still being exported (+$exp/month) - no shortage yet. Add generation when exports stop.")}else{$next.Add("Power $ep% used$(if($imp -gt 0){" and importing ($imp/month)"}): add another generator soon.")} }
  if([double]$u.water.capacity -eq 0){$next.Add('No water: place WaterTower01 (groundwater) or a pumping station on a shore, beside a connected road.')}elseif($wp -ge 80){$next.Add("Water $wp% used: add another water source.")}
  if([double]$u.sewage.capacity -eq 0){$next.Add('No sewage: place SewageOutlet01 on a shoreline, beside a connected road, away from water intakes.')}elseif($sp -ge 80){$next.Add("Sewage $sp% used: add capacity.")}
  foreach($g in $groups){$next.Add("$($g.Count) buildings short of $($g.Name): check that source's road connects to them, or add capacity.")}
