@@ -334,7 +334,7 @@ function Do-Upgrade {
   if($best.prefab -eq $p.name){$out+="  ($($pt.x),$($pt.z)): already $($p.name)"; continue}
   try { $r=Bridge upgrade_network @{index=$best.index;version=$best.version;prefabIndex=$p.index;prefabVersion=$p.version;maxCost=$(if($MaxCost){$MaxCost}else{200000})} 60
         $out+="  ($($pt.x),$($pt.z)): $($best.prefab) -> $($p.name) $(if($r.previewCost){"cost $($r.previewCost)"})" }
-  catch { $out+="  ($($pt.x),$($pt.z)): FAILED $((($_.Exception.Message) -split "`n")[0])" }
+  catch { $m=$_.Exception.Message; $why=if($m -match 'Reasons: ([^.]*)\.'){" ($($Matches[1]))"}else{''}; $out+="  ($($pt.x),$($pt.z)): FAILED $(($m -split "`n")[0] -replace '^upgrade_network failed: ','')$why$(if($why -match 'Overlap'){' - a wider road would hit a building beside it'})" }
  }
  Out-Result $out { "upgrade to $($p.name):"; $out }
 }
@@ -464,6 +464,7 @@ function Do-Buy {
 }
 # Plain-English fixes for the in-game warning icons (notification prefab names vary; match loosely).
 $IconAdvice=[ordered]@{
+ 'Accident'='usually clears by itself (emergency services tow it); if it keeps happening, simplify that junction'
  'Traffic|Jam'='add a parallel route/second link to the highway, or widen it: city.ps1 upgrade -Path x,z -Type large'
  'Electric|Power'='add generation or connect this area to a powered road'
  'Water|Pipe'='add water capacity or connect this area to a road reached by your water source'
@@ -486,9 +487,10 @@ function Do-Problems {
  if($At){$c=ParsePoint $At '-At'; $req.x=$c.x; $req.z=$c.z; $req.radius=if([double]::IsNaN($Radius)){500}else{$Radius}}
  try { $r=Bridge get_notifications $req } catch { if($_.Exception.Message -match 'unknown_command|ValidateSet|does not belong'){throw 'get_notifications needs bridge DLL 0.5.0-coach.1 (see INSTALL.md). Until then use: city.ps1 buildings -Problems'}; throw }
  Out-Result $r {
-  if(!$r.total){'no warning icons right now'; return}
+  $types=@($r.types|Where-Object {$_.type -ne 'Selected'})
+  if(!$types.Count){'no warning icons right now'; return}
   "$($r.total) warning icons on the map:"
-  foreach($g in @($r.types)){
+  foreach($g in $types){
    "  $($g.type) x$($g.count) [$($g.priority)]$(if($a=Advice $g.type){"  -> $a"})"
    foreach($ex in @($g.examples)|Select-Object -First ([Math]::Min(5,$Limit))){ "      at ({0:N0},{1:N0}){2}" -f $ex.position.x,$ex.position.z,$(if($ex.on){" on $($ex.on.kind) $($ex.on.prefab) $($ex.on.index):$($ex.on.version)"}) }
   }
@@ -536,7 +538,7 @@ function Do-Overview {
  if([double]$d.budget.balanceRaw -lt 0){$next.Add("Budget negative ($($d.budget.balanceRaw)/month): grow population, raise taxes a little, or trim service budgets.")}
  $top=@($pen|Group-Object factor|Sort-Object Count -Descending|Select-Object -First 4)
  foreach($t in $top){ if($t.Name -eq 'NotEnoughEmployees'){ if((@($d.demand.residential)|Measure-Object -Maximum).Maximum -gt 30){$next.Add("$($t.Count) businesses lack workers: zone more housing.")}else{$next.Add("$($t.Count) businesses lack workers, but housing demand is low: residents are still moving in ($([int]$c.populationWithMoveIn-[int]$c.population)) or commutes are too long. Keep growing; avoid zoning more jobs for now.")} } elseif($t.Name -eq 'WindSpeed'){} else {$next.Add("$($t.Count) buildings penalised by $($t.Name).")} }
- try { $icons=Bridge get_notifications @{examples=1}; foreach($g in @($icons.types)|Select-Object -First 4){ $ex=@($g.examples)[0]; $next.Add("$($g.count) '$($g.type)' warning icon(s), e.g. at ($([Math]::Round($ex.position.x)),$([Math]::Round($ex.position.z))). $(Advice $g.type)  (city.ps1 problems)") } } catch {}
+ try { $icons=Bridge get_notifications @{examples=1}; foreach($g in @($icons.types|Where-Object {$_.type -ne 'Selected'})|Select-Object -First 4){ $ex=@($g.examples)[0]; $next.Add("$($g.count) '$($g.type)' warning icon(s), e.g. at ($([Math]::Round($ex.position.x)),$([Math]::Round($ex.position.z))). $(Advice $g.type)  (city.ps1 problems)") } } catch {}
  if(!$next.Count){$next.Add('No urgent problems. Grow (city.ps1 grow), then expand roads + zoning as demand rises.')}
  $o=[ordered]@{city=$c;demand=$d.demand;budget=$d.budget;utilities=$u;shortages=$groups|ForEach-Object {@{type=$_.Name;count=$_.Count}};penalties=$top|ForEach-Object {@{factor=$_.Name;count=$_.Count}};buildings=$d.buildingCount;underConstruction=$d.underConstruction;next=$next}
  Out-Result $o {

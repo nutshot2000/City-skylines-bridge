@@ -32,6 +32,7 @@ namespace CitiesIIAgentBridge
                 if (icon.m_ClusterLayer != IconClusterLayer.Default) continue; // skip selection markers and money pop-ups
                 if (useArea && math.distance(icon.m_Location.xz, centre) > radius) continue;
                 string type = ps.GetPrefabName(em.GetComponentData<PrefabRef>(e).m_Prefab) ?? "unknown";
+                if (type == "Selected") continue; // the player's selection marker, not a city problem
                 if (type.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 total++;
                 if (!groups.TryGetValue(type, out var g)) g = (icon.m_Priority, new List<JObject>(), 0);
