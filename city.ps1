@@ -163,6 +163,7 @@ $Help=[ordered]@{
  place     = "place -Name <asset> -At x,z [-Rotation deg] [-Radius 150]  - place a service/utility building. Without -Rotation it tries road-side sites near -At until the game accepts one. Refuses if it would leave less than -Reserve money (default 50000)."
  problems  = "problems [-At x,z -Radius 500] [-Filter Traffic]  - the warning icons flashing in-game (traffic jams, no water, no workers...) with locations and fixes (DLL 0.5.0+)."
  buildings = "buildings [-Filter text] [-Problems] [-At x,z -Radius 300]  - list your buildings (id, name, position, issues)."
+ powerlink = "powerlink  - connect the map's own pylons (outside power line) to your city with a transformer: import power before you have generators, sell surplus later. Do this early."
  cleanup   = "cleanup [-Filter Destroyed]  - bulldoze buildings the game flags as destroyed/collapsed/abandoned (after tornadoes, fires, abandonment) so the lots regrow."
  inspect   = "inspect -Id index:version  - details of one building/road/node."
  demolish  = "demolish -Id index:version  - bulldoze one building or road segment you own."
@@ -387,6 +388,22 @@ function Do-Link {
   $r=[pscustomobject]@{previewCost=$b2.moneySpent}
  } else { try { $r=Bridge build_network $req } catch { throw "$($_.Exception.Message)`n  The straight line from ($([Math]::Round($best[0].position.x)),$([Math]::Round($best[0].position.z))) to ($([Math]::Round($best[1].position.x)),$([Math]::Round($best[1].position.z))) is blocked. Add waypoints around the obstacle: -Path 'x,z' 'x,z'" } }
  Out-Result $r {"$net built between $From and $To ($([Math]::Round($bd)) m direct, cost $($r.previewCost)). Check city.ps1 problems: the 'not connected' icon should clear within a minute of game time."}
+}
+
+function Do-PowerLink {
+ # Connect the map's pre-built high-voltage line (an outside power connection) to the city:
+ # a TransformerStation01 beside the unconnected end pylon snaps on. Lets a new city import power
+ # before it has generators, and sell surplus later. Needs a road near the pylon.
+ $r=Bridge get_notifications @{filter='Powerline Not Connected';examples=20}
+ $pylons=@($r.types|Where-Object {$_}|ForEach-Object {@($_.examples)}|Where-Object {$_.on.kind -eq 'intersection' -and (DistToLand $_.position) -lt 1})
+ if(!$pylons.Count){Out-Result @{linked=0} {'no unconnected map pylons on your land (already linked, or the line ends outside your tiles - buy that tile: city.ps1 land)'}; return}
+ $out=@()
+ foreach($py in $pylons){
+  $at="$([Math]::Round($py.position.x)),$([Math]::Round($py.position.z))"
+  try { $script:At=$at; $script:Name='TransformerStation01'; $script:Rotation=[double]::NaN; $script:Radius=120; $res=Do-Place; $out+="pylon at ($at): $res" }
+  catch { $out+="pylon at ($at): $(($_.Exception.Message -split "`n")[0]) - build a short road next to it, then run powerlink again" }
+ }
+ Out-Result $out { $out; 'Check with: city.ps1 problems -Filter Powerline (should be empty) and city.ps1 budget (ExportElectricity/ImportElectricity).' }
 }
 
 function Do-Cleanup {
@@ -677,7 +694,7 @@ try {
  switch($Verb){
   'help'{Do-Help} 'status'{Do-Status} 'overview'{Do-Overview} 'speed'{Do-Speed} 'grow'{Do-Grow} 'find'{Do-Find}
   'zones'{Do-Zones} 'map'{Do-Map} 'roads'{Do-Roads} 'road'{Do-Road} 'upgrade'{Do-Upgrade} 'link'{Do-Link} 'zone'{Do-Zone} 'place'{Do-Place}
-  'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'cleanup'{Do-Cleanup} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
+  'buildings'{Do-Buildings} 'inspect'{Do-Inspect} 'demolish'{Do-Demolish} 'cleanup'{Do-Cleanup} 'powerlink'{Do-PowerLink} 'unlocks'{Do-Unlocks} 'budget'{Do-Budget}
   'land'{Do-Land} 'buyland'{Do-BuyLand} 'tax'{Do-Tax} 'problems'{Do-Problems} 'buy'{Do-Buy} 'milestones'{Do-Milestones} 'chirper'{Do-Chirper} 'save'{Do-Save} 'raw'{Do-Raw}
   default {throw "Unknown verb '$Verb'. Run: city.ps1 help"}
  }

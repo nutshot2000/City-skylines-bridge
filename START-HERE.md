@@ -23,6 +23,7 @@ This is the sequence that built Klanka Canyon, from an empty map to 1,000+ resid
 ./city.ps1 status                                   # money, population, speed, controls
 ./city.ps1 map -Radius 900                          # where is land, water, your roads? (# = your land)
 ./city.ps1 roads                                    # the starter road the map gives you (already joined to the highway)
+./city.ps1 powerlink                                # if the map's pylons end on your land: transformer there = import power now, sell surplus later
 ./city.ps1 road -Path '473,1343' '473,1643' -Type medium            # a spine off the starter road
 ./city.ps1 road -Path '273,1443' '673,1443' -Type small             # cross streets ~100 m apart
 ./city.ps1 zone -Type residential -From 280,1395 -To 400,1692       # homes either side of the streets
