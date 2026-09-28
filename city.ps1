@@ -469,7 +469,7 @@ function Do-Place {
   $owned=@(OwnedBoxes); $outside=0
   foreach($s in $sites){
    if($owned.Count -and !(InOwned $s.position $owned)){$outside++;continue}
-   if($tries.Count -lt 8){$tries+=[ordered]@{position=[ordered]@{x=[Math]::Round($s.position.x,2);z=[Math]::Round($s.position.z,2)};rotation=[Math]::Round($s.rotation,1)}}
+   if($tries.Count -lt 16){$tries+=[ordered]@{position=[ordered]@{x=[Math]::Round($s.position.x,2);z=[Math]::Round($s.position.z,2)};rotation=[Math]::Round($s.rotation,1)}}
   }
   if(!$tries.Count){$lot=(Bridge get_prefab_details @{index=$p.index;version=$p.version}).rawData.'Game.Prefabs.BuildingData'.m_LotSize; $size=if($lot){" It needs a $([int]$lot.x*8) m wide (along the road) x $([int]$lot.y*8) m deep lot."}else{''}; throw "No free road-side site for $($p.name) within $rad m of ($($c.x),$($c.z))$(if($outside){" ($outside more were outside land you own)"}). Road sides there are already used by zoned buildings or other services. Build a short dead-end road into EMPTY UNZONED land and place it there, or raise -Radius.$size"}
  }
